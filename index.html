@@ -796,8 +796,8 @@
                     adminTabBtn.classList.add('hidden');
                     historyUserFilterContainer.classList.add('hidden');
                 }
-                githubUserInput.value = localStorage.getItem('github_user') || GITHUB_USER;
-                githubRepoInput.value = localStorage.getItem('github_repo') || GITHUB_REPO;
+                githubUserInput.value = localStorage.getItem('github_user') || '';
+                githubRepoInput.value = localStorage.getItem('github_repo') || '';
                 switchTab('vender-view');
                 startNewSale();
             }
