@@ -23,7 +23,7 @@ jobs:
       - name: Run update script
         run: |
           python update_script.py '${{ github.event.inputs.changes }}'
-
+        
       - name: Commit and push changes
         run: |
           git config --global user.name 'GitHub Actions Bot'
