@@ -47,19 +47,16 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <!-- TELA INICIAL PARA CONFIGURAR O GITHUB -->
+    <!-- TELA INICIAL DE CARREGAMENTO -->
     <div id="setup-view" class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center hidden">
-        <h2 class="text-3xl font-bold text-center text-gray-800">Configuração Inicial</h2>
-        <p class="text-gray-600">Para começar, insira os dados do seu repositório no GitHub para carregar a base de dados.</p>
-        <div>
-            <label for="setup-github-user" class="block text-sm font-medium text-gray-700 text-left">Utilizador do GitHub</label>
-            <input type="text" id="setup-github-user" class="mt-1 block w-full px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: seu-nome-de-usuario">
+        <h2 class="text-3xl font-bold text-center text-gray-800">A configurar a aplicação</h2>
+        <p class="text-gray-600">A fazer o download da base de dados pela primeira vez. Por favor, aguarde.</p>
+        <div class="flex justify-center items-center py-4">
+            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
         </div>
-        <div>
-            <label for="setup-github-repo" class="block text-sm font-medium text-gray-700 text-left">Repositório</label>
-            <input type="text" id="setup-github-repo" class="mt-1 block w-full px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: meu-repositorio-de-vendas">
-        </div>
-        <button id="start-load-btn" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all">Carregar Base de Dados</button>
         <p id="setup-error" class="text-sm text-center text-red-500 min-h-[20px]"></p>
     </div>
 
@@ -232,11 +229,11 @@
                         
                         <div>
                             <label for="github-user" class="block text-sm font-medium text-gray-700">Utilizador do GitHub</label>
-                            <input type="text" id="github-user" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: seu-nome-de-usuario">
+                            <input type="text" id="github-user" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: seu-nome-de-usuario" disabled>
                         </div>
                         <div>
                             <label for="github-repo" class="block text-sm font-medium text-gray-700">Repositório</label>
-                            <input type="text" id="github-repo" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: meu-repositorio-de-vendas">
+                            <input type="text" id="github-repo" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: meu-repositorio-de-vendas" disabled>
                         </div>
                         <div>
                             <label for="github-pat" class="block text-sm font-medium text-gray-700">Token de Acesso Pessoal (PAT)</label>
@@ -309,7 +306,7 @@
                 <div><label for="pair-category" class="block text-sm font-medium text-gray-700">1. Selecione a Categoria</label><select id="pair-category" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm"><option value="">-- Escolha --</option></select></div>
                 <div><label for="pair-subcategory" class="block text-sm font-medium text-gray-700">2. Selecione a Subcategoria</label><select id="pair-subcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
                 <div id="pair-subsubcategory-container" class="hidden"><label for="pair-subsubcategory" class="block text-sm font-medium text-gray-700">3. Selecione a Sub-Subcategoria (Opcional)</label><select id="pair-subsubcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
-                <div><label for="pair-product" class="block text-sm font-medium text-gray-700">4. Selecione o Produto</label><select id="pair-product" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div><label for="pair-product" class="block text-sm font-medium text-gray-700">4. Selecione o Produto</label><select id="pair-product" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
                 <div id="paired-product-info" class="p-3 bg-blue-50 rounded-lg min-h-[60px] hidden"><p class="font-semibold text-blue-800 text-sm" id="paired-product-name"></p><p class="text-xs text-gray-600" id="paired-product-cod"></p><p class="text-xs text-gray-600 mt-1" id="paired-product-current-barcode"></p></div>
                 <div>
                     <label for="new-barcode-pair" class="block text-sm font-medium text-gray-700">5. Digite ou Escaneie o Novo Código de Barras</label>
@@ -799,6 +796,8 @@
                     adminTabBtn.classList.add('hidden');
                     historyUserFilterContainer.classList.add('hidden');
                 }
+                githubUserInput.value = localStorage.getItem('github_user') || GITHUB_USER;
+                githubRepoInput.value = localStorage.getItem('github_repo') || GITHUB_REPO;
                 switchTab('vender-view');
                 startNewSale();
             }
