@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sistema de Pedidos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@ericblade/quagga2@1.6.0/dist/quagga.min.js"></script>
+    <!-- Biblioteca para Hashing SHA256 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .transition-all { transition: all 0.3s ease-in-out; }
+        .modal-bg { background-color: rgba(0, 0, 0, 0.5); }
+        .scanner-container { width: 100%; max-width: 400px; margin: 0 auto; }
+        .scanner-viewport { width: 100% !important; height: auto !important; aspect-ratio: 4/3; overflow: hidden; border-radius: 0.5rem; cursor: pointer; }
+        .scanner-viewport video, .scanner-viewport canvas { width: 100% !important; height: auto !important; }
+        
+        .scanner-container::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            right: 5%;
+            height: 2px;
+            background-color: rgba(255, 0, 0, 0.7);
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        .tab-active {
+            border-bottom-color: #2563eb;
+            color: #2563eb;
+        }
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .online { background-color: #22c55e; }
+        .offline { background-color: #ef4444; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <!-- TELA INICIAL PARA CARREGAR DADOS -->
+    <div id="setup-view" class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center hidden">
+        <h2 class="text-3xl font-bold text-center text-gray-800">Bem-vindo!</h2>
+        <p class="text-gray-600">Para começar, por favor, carregue o seu ficheiro de base de dados (`.json`).</p>
+        <div>
+            <label for="load-database-input" class="w-full py-3 px-4 inline-flex items-center justify-center font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all cursor-pointer">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
+                Selecionar Ficheiro de Dados (.json)
+            </label>
+            <input type="file" id="load-database-input" class="hidden" accept=".json">
+        </div>
+        <div id="file-selection-status" class="text-sm text-gray-500 min-h-[20px]"></div>
+        <button id="start-load-btn" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all hidden disabled:bg-gray-400" disabled>Iniciar Carregamento</button>
+        <p id="setup-error" class="text-sm text-center text-red-500"></p>
+    </div>
+
+    <!-- TELA DE LOGIN -->
+    <div id="login-view" class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg hidden">
+        <h2 class="text-3xl font-bold text-center text-gray-800">Aceder ao Sistema</h2>
+        <div>
+            <label for="username" class="block text-sm font-medium text-gray-700">Utilizador</label>
+            <input type="text" id="username" class="mt-1 block w-full px-4 py-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div>
+            <label for="password" class="block text-sm font-medium text-gray-700">Senha</label>
+            <input type="password" id="password" class="mt-1 block w-full px-4 py-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+        </div>
+        <div class="flex items-center">
+            <input id="keep-logged-in" name="keep-logged-in" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+            <label for="keep-logged-in" class="ml-2 block text-sm text-gray-900">Permanecer ligado</label>
+        </div>
+        <button id="login-btn" class="w-full py-3 mt-4 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50 transition-all">
+            Entrar
+        </button>
+        <p id="login-error" class="text-sm text-center text-red-500"></p>
+    </div>
+
+    <!-- TELA PRINCIPAL DA APLICAÇÃO -->
+    <div id="app-view" class="w-full max-w-md bg-gray-50 hidden flex flex-col h-screen">
+        <nav class="bg-white shadow-md">
+            <div class="flex justify-around border-b">
+                <button data-tab="vender-view" class="tab-btn flex-1 py-4 px-2 text-center text-sm font-medium border-b-2 border-transparent hover:text-blue-500 transition-all">Vender</button>
+                <button data-tab="historico-view" class="tab-btn flex-1 py-4 px-2 text-center text-sm font-medium border-b-2 border-transparent hover:text-blue-500 transition-all">Histórico</button>
+                <button data-tab="admin-view" id="admin-tab-btn" class="tab-btn flex-1 py-4 px-2 text-center text-sm font-medium border-b-2 border-transparent hover:text-blue-500 transition-all hidden">Admin</button>
+                <button data-tab="config-view" class="tab-btn flex-1 py-4 px-2 text-center text-sm font-medium border-b-2 border-transparent hover:text-blue-500 transition-all">Configurações</button>
+            </div>
+        </nav>
+
+        <main class="flex-grow overflow-y-auto">
+            <div id="vender-view" class="tab-content p-4">
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <div class="space-y-2">
+                        <div class="relative">
+                            <label for="code-input" class="block text-sm font-medium text-gray-700">Código do Produto</label>
+                            <input type="text" id="code-input" placeholder="Digite ou escaneie o código" class="mt-1 block w-full px-4 py-2 text-lg bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12">
+                            <button id="scan-code-btn" class="absolute right-1 top-8 bg-gray-200 hover:bg-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 10h18M3 14h18M3 18h18" /></svg>
+                            </button>
+                        </div>
+                        <div id="product-info" class="p-3 bg-blue-50 rounded-lg min-h-[60px] hidden">
+                            <div id="product-found-controls" class="hidden">
+                                <p class="font-semibold text-blue-800 text-sm" id="product-name"></p>
+                                <p class="text-xl font-bold text-blue-900" id="product-price"></p>
+                                <div class="flex items-center justify-between mt-2">
+                                    <div class="flex items-center gap-2">
+                                        <button id="decrease-qty-btn" class="w-8 h-8 bg-gray-200 rounded-full font-bold text-lg">-</button>
+                                        <span id="product-quantity" class="text-lg font-bold">1</span>
+                                        <button id="increase-qty-btn" class="w-8 h-8 bg-gray-200 rounded-full font-bold text-lg">+</button>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <button id="cancel-add-btn" class="w-10 h-10 bg-red-500 text-white rounded-lg flex items-center justify-center font-bold text-xl">X</button>
+                                        <button id="add-to-cart-btn" class="h-10 px-4 font-semibold text-white bg-green-600 rounded-lg">Adicionar</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="product-not-found-controls" class="hidden">
+                                <p id="product-not-found-message" class="font-semibold text-red-800 text-sm">Produto não encontrado.</p>
+                                <button id="register-new-product-link" class="w-full mt-2 py-2 font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 hidden">Registar Novo Produto</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md flex flex-col mt-4">
+                    <h3 class="text-lg font-semibold mb-2 text-gray-700">Carrinho</h3>
+                    <div id="cart-items" class="flex-grow space-y-2 overflow-y-auto max-h-[20vh] border-t border-b py-2">
+                        <p class="text-gray-500 text-center">Carrinho vazio</p>
+                    </div>
+                    <div class="mt-2 pt-2 border-t">
+                        <div class="space-y-3">
+                            <h4 class="text-md font-semibold text-gray-700">Desconto</h4>
+                            <div class="flex items-center gap-4">
+                                <div class="flex items-center">
+                                    <input id="discount-5-percent" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                    <label for="discount-5-percent" class="ml-2 text-sm text-gray-700">5%</label>
+                                </div>
+                                <div>
+                                    <label for="discount-custom-amount" class="sr-only">Outro valor de desconto</label>
+                                    <input type="number" id="discount-custom-amount" placeholder="Outro valor" class="w-28 px-2 py-1 text-sm bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                            </div>
+
+                            <h4 class="text-md font-semibold text-gray-700 pt-2 border-t mt-4">Pagamento</h4>
+                            <div id="payment-entries" class="space-y-2"></div>
+                            <div class="flex items-end gap-2">
+                                <div class="flex-1">
+                                    <label for="payment-method-select" class="block text-xs font-medium text-gray-600">Forma de Pagamento</label>
+                                    <select id="payment-method-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <option>Dinheiro</option><option>Pix</option><option>Cartão de Crédito</option><option>Cartão de Débito</option><option>Créditos</option>
+                                    </select>
+                                </div>
+                                <div id="installments-container" class="flex-1 hidden">
+                                    <label for="installments-select" class="block text-xs font-medium text-gray-600">Parcelas</label>
+                                    <select id="installments-select" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                                        <option value="À Vista">À Vista</option><option value="2x">2x</option><option value="3x">3x</option><option value="4x">4x</option><option value="5x">5x</option><option value="6x">6x</option><option value="7x">7x</option><option value="8x">8x</option><option value="9x">9x</option><option value="10x">10x</option>
+                                    </select>
+                                </div>
+                            </div>
+                             <div class="flex items-end gap-2 mt-2">
+                                <div class="flex-1">
+                                    <label for="payment-amount-input" class="block text-xs font-medium text-gray-600">Valor Pago</label>
+                                    <input type="number" id="payment-amount-input" placeholder="0.00" class="mt-1 block w-full px-3 py-2 text-base bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <button id="add-payment-btn" class="h-10 px-4 font-semibold text-white bg-cyan-600 rounded-lg hover:bg-cyan-700">Add</button>
+                            </div>
+                        </div>
+                        <div class="mt-4 space-y-1 text-sm">
+                            <div class="flex justify-between"><span>Subtotal:</span><span id="cart-subtotal">R$ 0,00</span></div>
+                            <div id="discount-info" class="hidden text-green-600 flex justify-between"><span>Desconto:</span><span id="discount-amount">- R$ 0,00</span></div>
+                            <div class="flex justify-between font-semibold"><span>Total Pago:</span><span id="total-paid">R$ 0,00</span></div>
+                            <div class="flex justify-between font-semibold" id="remaining-balance-container"><span>Restante:</span><span id="remaining-balance" class="text-red-600">R$ 0,00</span></div>
+                        </div>
+                        <div class="flex justify-between items-center text-xl font-bold mt-2 pt-2 border-t"><span class="text-gray-800">TOTAL:</span><span id="cart-total" class="text-green-700">R$ 0,00</span></div>
+                        <div class="flex flex-col gap-2 mt-4">
+                             <button id="finalize-sale-btn" class="w-full py-3 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition-all" disabled>Finalizar Venda</button>
+                             <button id="clear-cart-btn" class="w-full py-2 text-sm font-semibold text-gray-700 bg-gray-200 rounded-lg hover:bg-gray-300 transition-all">Limpar</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="historico-view" class="tab-content p-4 hidden">
+                <div class="bg-white w-full rounded-xl shadow-md p-6 flex flex-col">
+                    <div class="flex justify-between items-center mb-2">
+                        <h2 class="text-xl font-bold text-gray-800">Histórico de Vendas</h2>
+                        <span id="history-total" class="text-lg font-bold text-gray-800">R$ 0,00</span>
+                    </div>
+                    <div class="mb-4">
+                        <label for="history-date" class="block text-sm font-medium text-gray-700">Filtrar por data:</label>
+                        <input type="date" id="history-date" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                    </div>
+                    <div id="history-user-filter-container" class="mb-4 hidden">
+                        <label for="history-user-filter" class="block text-sm font-medium text-gray-700">Filtrar por funcionário:</label>
+                        <select id="history-user-filter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"></select>
+                    </div>
+                    <div id="history-content" class="overflow-y-auto space-y-3"></div>
+                </div>
+            </div>
+            <div id="admin-view" class="tab-content p-4 hidden">
+                <div class="bg-white w-full rounded-xl shadow-md p-6 flex flex-col gap-4">
+                    <h2 class="text-xl font-bold text-gray-800 text-center">Painel do Administrador</h2>
+                    <button id="add-product-btn" class="w-full py-3 font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-all">Registar Novo Produto</button>
+                    <button id="pair-product-btn" class="w-full py-3 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all">Casar Produto</button>
+                    <button id="edit-barcode-btn" class="w-full py-3 font-semibold text-white bg-blue-800 rounded-lg hover:bg-blue-900 transition-all">Editar Código de Barras</button>
+                    <button id="adjust-stock-btn" class="w-full py-3 font-semibold text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-all">Ajustar Estoque</button>
+                    <button id="add-user-btn" class="w-full py-3 font-semibold text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-all">Registar Novo Funcionário</button>
+                    <button id="export-data-btn" class="w-full py-3 font-semibold text-white bg-gray-600 rounded-lg hover:bg-gray-700 transition-all">Importar/Exportar Dados</button>
+                    <button id="export-changes-btn" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all">Exportar Mudanças</button>
+                    <button id="export-sales-btn" class="w-full py-3 font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-all">Exportar Vendas (CSV)</button>
+                </div>
+            </div>
+            <div id="config-view" class="tab-content p-4 hidden">
+                 <div class="bg-white w-full rounded-xl shadow-md p-6 space-y-6">
+                    <h2 class="text-xl font-bold text-gray-800 text-center">Configurações</h2>
+                    
+                    <div class="text-center">
+                        <p>Utilizador logado: <span id="current-user-info" class="font-semibold"></span></p>
+                    </div>
+
+                    <div class="p-4 bg-gray-100 rounded-lg space-y-4">
+                        <h3 class="font-semibold text-lg text-gray-700 text-center">Sincronização com GitHub</h3>
+                        
+                        <div>
+                            <label for="github-user" class="block text-sm font-medium text-gray-700">Utilizador do GitHub</label>
+                            <input type="text" id="github-user" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: seu-nome-de-usuario">
+                        </div>
+                        <div>
+                            <label for="github-repo" class="block text-sm font-medium text-gray-700">Repositório</label>
+                            <input type="text" id="github-repo" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: meu-repositorio-de-vendas">
+                        </div>
+                        <div>
+                            <label for="github-pat" class="block text-sm font-medium text-gray-700">Token de Acesso Pessoal (PAT)</label>
+                            <input type="password" id="github-pat" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <p class="text-xs text-gray-500 mt-1">O seu token é usado para autorizar o upload e não é guardado.</p>
+                        </div>
+
+                        <div class="flex items-center justify-center pt-4 border-t">
+                            <span id="status-dot" class="status-dot"></span>
+                            <span id="sync-status" class="text-sm font-medium text-gray-600">Verificando...</span>
+                        </div>
+                        <p id="sync-message" class="text-xs text-center text-gray-500 min-h-[32px]"></p>
+                        <button id="sync-btn" class="w-full py-2 font-semibold text-white bg-gray-600 rounded-lg hover:bg-gray-700 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                            Sincronizar Agora
+                        </button>
+                    </div>
+
+                    <div class="flex justify-center">
+                        <button id="logout-btn-config" class="px-6 py-3 text-sm font-medium text-white bg-red-500 rounded-lg hover:bg-red-600 transition-all">Sair da Conta</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAIS -->
+    <div id="alert-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 modal-bg"><div class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 text-center"><p id="alert-message" class="text-lg text-gray-700 mb-4"></p><button id="close-alert-btn" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">OK</button></div></div>
+    <div id="confirm-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 modal-bg"><div class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 text-center"><p id="confirm-message" class="text-lg text-gray-700 mb-6"></p><div class="flex justify-center gap-4"><button id="confirm-no-btn" class="px-6 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400">Não</button><button id="confirm-yes-btn" class="px-6 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">Sim</button></div></div></div>
+    <div id="scanner-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-gray-800">Aponte para o Código</h2><button id="close-scanner-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button></div>
+            <div id="scanner-container" class="relative scanner-container"><div id="scanner-viewport" class="scanner-viewport"></div></div>
+            <div class="mt-4 flex justify-center"><button class="focus-btn hidden px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Focar</button></div>
+        </div>
+    </div>
+    <div id="add-product-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full overflow-y-auto max-h-full">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-gray-800">Registar Novo Produto</h2><button id="close-add-product-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button></div>
+            <div id="add-product-scanner-container" class="relative hidden mb-4 bg-gray-200 rounded-lg scanner-container">
+                <div id="add-product-scanner-viewport" class="scanner-viewport"></div>
+                <div class="mt-2 flex justify-center"><button class="focus-btn hidden px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Focar</button></div>
+            </div>
+            <form id="add-product-form" class="space-y-3">
+                <div>
+                    <label for="new-cod" class="block text-sm font-medium text-gray-700">Código (Chave Primária)</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="new-cod" required class="block w-full px-4 py-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12">
+                        <button type="button" id="scan-new-code-btn" class="absolute right-1 top-1/2 -translate-y-1/2 bg-gray-200 hover:bg-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 10h18M3 14h18M3 18h18" /></svg></button>
+                    </div>
+                </div>
+                <div><label for="new-product-name" class="block text-sm font-medium text-gray-700">Nome do Produto</label><input type="text" id="new-product-name" required class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="new-product-price" class="block text-sm font-medium text-gray-700">Preço (ex: 12.50)</label><input type="number" step="0.01" id="new-product-price" required class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="new-barcode" class="block text-sm font-medium text-gray-700">Código de Barras (Opcional)</label><input type="text" id="new-barcode" class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="new-category" class="block text-sm font-medium text-gray-700">Categoria (Opcional)</label><input type="text" id="new-category" class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="new-subcategory" class="block text-sm font-medium text-gray-700">Subcategoria (Opcional)</label><input type="text" id="new-subcategory" class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="new-subsubcategory" class="block text-sm font-medium text-gray-700">Sub-Subcategoria (Opcional)</label><input type="text" id="new-subsubcategory" class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <div><label for="new-estoque" class="block text-sm font-medium text-gray-700">Estoque (Opcional)</label><input type="number" id="new-estoque" class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <button type="submit" class="w-full py-3 mt-4 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all">Salvar Produto</button>
+            </form>
+        </div>
+    </div>
+    <div id="pair-product-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full overflow-y-auto max-h-full">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-gray-800">Casar Produto com Código de Barras</h2><button id="close-pair-product-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button></div>
+            <div id="pair-product-scanner-container" class="relative hidden mb-4 bg-gray-200 rounded-lg scanner-container">
+                <div id="pair-product-scanner-viewport" class="scanner-viewport"></div>
+                <div class="mt-2 flex justify-center"><button class="focus-btn hidden px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Focar</button></div>
+            </div>
+            <div class="space-y-4">
+                <div><label for="pair-category" class="block text-sm font-medium text-gray-700">1. Selecione a Categoria</label><select id="pair-category" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm"><option value="">-- Escolha --</option></select></div>
+                <div><label for="pair-subcategory" class="block text-sm font-medium text-gray-700">2. Selecione a Subcategoria</label><select id="pair-subcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div id="pair-subsubcategory-container" class="hidden"><label for="pair-subsubcategory" class="block text-sm font-medium text-gray-700">3. Selecione a Sub-Subcategoria (Opcional)</label><select id="pair-subsubcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div><label for="pair-product" class="block text-sm font-medium text-gray-700">4. Selecione o Produto</label><select id="pair-product" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div id="paired-product-info" class="p-3 bg-blue-50 rounded-lg min-h-[60px] hidden"><p class="font-semibold text-blue-800 text-sm" id="paired-product-name"></p><p class="text-xs text-gray-600" id="paired-product-cod"></p><p class="text-xs text-gray-600 mt-1" id="paired-product-current-barcode"></p></div>
+                <div>
+                    <label for="new-barcode-pair" class="block text-sm font-medium text-gray-700">5. Digite ou Escaneie o Novo Código de Barras</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="new-barcode-pair" class="block w-full px-4 py-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12">
+                        <button type="button" id="scan-new-barcode-pair-btn" class="absolute right-1 top-1/2 -translate-y-1/2 bg-gray-200 hover:bg-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 10h18M3 14h18M3 18h18" /></svg></button>
+                    </div>
+                </div>
+                <div><label for="new-stock-pair" class="block text-sm font-medium text-gray-700">6. Novo Estoque (Opcional)</label><input type="number" id="new-stock-pair" class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <button id="save-pair-btn" class="w-full py-3 mt-4 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-all" disabled>Salvar Novo Código de Barras</button>
+            </div>
+        </div>
+    </div>
+    <div id="edit-barcode-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full overflow-y-auto max-h-full">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-gray-800">Editar Código de Barras</h2><button id="close-edit-barcode-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button></div>
+            <div id="edit-barcode-scanner-container" class="relative hidden mb-4 bg-gray-200 rounded-lg scanner-container">
+                <div id="edit-barcode-scanner-viewport" class="scanner-viewport"></div>
+                <div class="mt-2 flex justify-center"><button class="focus-btn hidden px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Focar</button></div>
+            </div>
+            <div class="space-y-4">
+                <div><label for="edit-category" class="block text-sm font-medium text-gray-700">1. Selecione a Categoria</label><select id="edit-category" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm"><option value="">-- Escolha --</option></select></div>
+                <div><label for="edit-subcategory" class="block text-sm font-medium text-gray-700">2. Selecione a Subcategoria</label><select id="edit-subcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div id="edit-subsubcategory-container" class="hidden"><label for="edit-subsubcategory" class="block text-sm font-medium text-gray-700">3. Selecione a Sub-Subcategoria (Opcional)</label><select id="edit-subsubcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div><label for="edit-product" class="block text-sm font-medium text-gray-700">4. Selecione o Produto</label><select id="edit-product" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div id="edited-product-info" class="p-3 bg-blue-50 rounded-lg min-h-[60px] hidden"><p class="font-semibold text-blue-800 text-sm" id="edited-product-name"></p><p class="text-xs text-gray-600" id="edited-product-cod"></p><p class="text-xs text-gray-600 mt-1" id="edited-product-current-barcode"></p></div>
+                <div>
+                    <label for="new-barcode-edit" class="block text-sm font-medium text-gray-700">5. Digite ou Escaneie o Novo Código de Barras</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="new-barcode-edit" class="block w-full px-4 py-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12">
+                        <button type="button" id="scan-new-barcode-edit-btn" class="absolute right-1 top-1/2 -translate-y-1/2 bg-gray-200 hover:bg-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 10h18M3 14h18M3 18h18" /></svg></button>
+                    </div>
+                </div>
+                <div><label for="new-stock-edit" class="block text-sm font-medium text-gray-700">6. Novo Estoque (Opcional)</label><input type="number" id="new-stock-edit" class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div>
+                <button id="save-edit-btn" class="w-full py-3 mt-4 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-all" disabled>Salvar Alteração</button>
+            </div>
+        </div>
+    </div>
+    <div id="adjust-stock-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full overflow-y-auto max-h-full">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-gray-800">Ajustar Estoque de Produto</h2><button id="close-adjust-stock-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button></div>
+            <div id="adjust-stock-scanner-container" class="relative hidden mb-4 bg-gray-200 rounded-lg scanner-container">
+                <div id="adjust-stock-scanner-viewport" class="scanner-viewport"></div>
+                <div class="mt-2 flex justify-center"><button class="focus-btn hidden px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">Focar</button></div>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label for="adjust-stock-code-input" class="block text-sm font-medium text-gray-700">1. Código do Produto</label>
+                    <div class="relative mt-1">
+                        <input type="text" id="adjust-stock-code-input" placeholder="Digite ou escaneie o código" class="block w-full px-4 py-2 text-base text-gray-700 bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 pr-12">
+                        <button type="button" id="scan-adjust-stock-btn" class="absolute right-1 top-1/2 -translate-y-1/2 bg-gray-200 hover:bg-gray-300 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" /><path stroke-linecap="round" stroke-linejoin="round" d="M3 6h18M3 10h18M3 14h18M3 18h18" /></svg></button>
+                    </div>
+                </div>
+                <div id="adjust-stock-product-info" class="p-3 bg-blue-50 rounded-lg min-h-[60px] hidden"><p class="font-semibold text-blue-800 text-sm" id="adjust-stock-product-name"></p><p class="text-xs text-gray-600 mt-1">Estoque Atual: <span id="adjust-stock-current-stock" class="font-bold"></span></p></div>
+                <div id="adjust-stock-controls" class="hidden">
+                    <label for="adjust-stock-new-stock" class="block text-sm font-medium text-gray-700 text-center">2. Nova Quantidade em Estoque</label>
+                    <div class="flex items-center justify-center gap-4 mt-2">
+                        <button type="button" id="stock-decrease-btn" class="w-12 h-12 bg-gray-200 rounded-full font-bold text-2xl flex items-center justify-center">-</button>
+                        <input type="number" id="adjust-stock-new-stock" placeholder="0" class="w-24 text-center text-2xl font-bold bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button type="button" id="stock-increase-btn" class="w-12 h-12 bg-gray-200 rounded-full font-bold text-2xl flex items-center justify-center">+</button>
+                    </div>
+                </div>
+                <button id="save-stock-adjustment-btn" class="w-full py-3 mt-4 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:bg-gray-400 transition-all" disabled>Salvar Novo Estoque</button>
+            </div>
+        </div>
+    </div>
+    <div id="add-user-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg"><div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-gray-800">Registar Novo Utilizador</h2><button id="close-add-user-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button></div><form id="add-user-form" class="space-y-4"><div><label for="new-username" class="block text-sm font-medium text-gray-700">Nome de Utilizador</label><input type="text" id="new-username" required class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label for="new-password" class="block text-sm font-medium text-gray-700">Senha</label><input type="password" id="new-password" required class="mt-1 block w-full px-4 py-2 text-base bg-gray-100 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"></div><div><label for="new-role" class="block text-sm font-medium text-gray-700">Função</label><select id="new-role" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm"><option value="employee">Funcionário</option><option value="admin">Administrador</option></select></div><button type="submit" class="w-full py-3 mt-4 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all">Salvar Utilizador</button></form></div></div>
+    <div id="export-data-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold text-gray-800">Importar & Exportar Dados</h2><button id="close-export-data-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button></div>
+            <div class="space-y-6">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Exportar Dados Locais</h3>
+                    <p class="text-sm text-gray-600 mb-3">Guarde um backup de todos os produtos, utilizadores e vendas registados neste dispositivo.</p>
+                    <button id="export-all-data-btn" class="w-full py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all">Exportar Tudo (.json)</button>
+                </div>
+                <div class="border-t border-gray-200"></div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-700 mb-2">Importar Dados</h3>
+                    <p class="text-sm text-gray-600 mb-3">Substitua todos os dados locais por um arquivo de backup. <strong class="text-red-600">Atenção: esta ação não pode ser desfeita.</strong></p>
+                    <input type="file" id="import-file-input" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                    <button id="import-data-btn" class="w-full mt-3 py-2 font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-all" disabled>Importar Agora</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- CONFIGURAÇÕES DE SINCRONIZAÇÃO ---
+            const GITHUB_DB_URL_TEMPLATE = 'https://raw.githubusercontent.com/{user}/{repo}/main/dados_offline.json';
+            const GITHUB_ACTIONS_URL_TEMPLATE = 'https://api.github.com/repos/{user}/{repo}/actions/workflows/update_database.yml/dispatches';
+
+            const DB = {
+                get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
+                set: (key, data) => localStorage.setItem(key, JSON.stringify(data)),
+            };
+
+            let currentUser = null;
+            let currentCart = [];
+            let currentProduct = null;
+            let currentQuantity = 1;
+            let isScannerActive = false;
+            let scannerTargetInput = null;
+            let pairableProductsList = [];
+            let editableProductsList = [];
+            let currentPayments = [];
+            let productForStockAdjustment = null;
+            let localChangesExist = false;
+
+            // --- ELEMENTOS DA UI ---
+            const setupView = document.getElementById('setup-view');
+            const loginView = document.getElementById('login-view');
+            const appView = document.getElementById('app-view');
+            const loginBtn = document.getElementById('login-btn');
+            const logoutBtnConfig = document.getElementById('logout-btn-config');
+            const usernameInput = document.getElementById('username');
+            const passwordInput = document.getElementById('password');
+            const keepLoggedInCheckbox = document.getElementById('keep-logged-in');
+            const loginError = document.getElementById('login-error');
+            const codeInput = document.getElementById('code-input');
+            const scanCodeBtn = document.getElementById('scan-code-btn');
+            const productInfo = document.getElementById('product-info');
+            const productName = document.getElementById('product-name');
+            const productPrice = document.getElementById('product-price');
+            const addToCartBtn = document.getElementById('add-to-cart-btn');
+            const cartItems = document.getElementById('cart-items');
+            const cartTotal = document.getElementById('cart-total');
+            const finalizeSaleBtn = document.getElementById('finalize-sale-btn');
+            const clearCartBtn = document.getElementById('clear-cart-btn');
+            const historyContent = document.getElementById('history-content');
+            const exportSalesBtn = document.getElementById('export-sales-btn');
+            const exportDataBtn = document.getElementById('export-data-btn');
+            const alertModal = document.getElementById('alert-modal');
+            const alertMessage = document.getElementById('alert-message');
+            const closeAlertBtn = document.getElementById('close-alert-btn');
+            const confirmModal = document.getElementById('confirm-modal');
+            const confirmMessage = document.getElementById('confirm-message');
+            const confirmYesBtn = document.getElementById('confirm-yes-btn');
+            const confirmNoBtn = document.getElementById('confirm-no-btn');
+            const scannerModal = document.getElementById('scanner-modal');
+            const closeScannerBtn = document.getElementById('close-scanner-btn');
+            const addProductModal = document.getElementById('add-product-modal');
+            const addProductBtn = document.getElementById('add-product-btn');
+            const closeAddProductBtn = document.getElementById('close-add-product-btn');
+            const addProductForm = document.getElementById('add-product-form');
+            const scanNewCodeBtn = document.getElementById('scan-new-code-btn');
+            const decreaseQtyBtn = document.getElementById('decrease-qty-btn');
+            const increaseQtyBtn = document.getElementById('increase-qty-btn');
+            const productQuantitySpan = document.getElementById('product-quantity');
+            const cancelAddBtn = document.getElementById('cancel-add-btn');
+            const discountInfo = document.getElementById('discount-info');
+            const discountAmountSpan = document.getElementById('discount-amount');
+            const historyDateInput = document.getElementById('history-date');
+            const historyTotalSpan = document.getElementById('history-total');
+            const addProductScannerContainer = document.getElementById('add-product-scanner-container');
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+            const adminTabBtn = document.getElementById('admin-tab-btn');
+            const historyUserFilterContainer = document.getElementById('history-user-filter-container');
+            const historyUserFilter = document.getElementById('history-user-filter');
+            const addUserBtn = document.getElementById('add-user-btn');
+            const addUserModal = document.getElementById('add-user-modal');
+            const closeAddUserBtn = document.getElementById('close-add-user-btn');
+            const addUserForm = document.getElementById('add-user-form');
+            const currentUserInfo = document.getElementById('current-user-info');
+            const pairProductBtn = document.getElementById('pair-product-btn');
+            const pairProductModal = document.getElementById('pair-product-modal');
+            const closePairProductBtn = document.getElementById('close-pair-product-btn');
+            const pairCategorySelect = document.getElementById('pair-category');
+            const pairSubcategorySelect = document.getElementById('pair-subcategory');
+            const pairSubsubcategoryContainer = document.getElementById('pair-subsubcategory-container');
+            const pairSubsubcategorySelect = document.getElementById('pair-subsubcategory');
+            const pairProductSelect = document.getElementById('pair-product');
+            const pairedProductInfo = document.getElementById('paired-product-info');
+            const pairedProductName = document.getElementById('paired-product-name');
+            const pairedProductCod = document.getElementById('paired-product-cod');
+            const pairedProductCurrentBarcode = document.getElementById('paired-product-current-barcode');
+            const newBarcodePairInput = document.getElementById('new-barcode-pair');
+            const scanNewBarcodePairBtn = document.getElementById('scan-new-barcode-pair-btn');
+            const savePairBtn = document.getElementById('save-pair-btn');
+            const pairProductScannerContainer = document.getElementById('pair-product-scanner-container');
+            const paymentEntries = document.getElementById('payment-entries');
+            const paymentMethodSelect = document.getElementById('payment-method-select');
+            const paymentAmountInput = document.getElementById('payment-amount-input');
+            const addPaymentBtn = document.getElementById('add-payment-btn');
+            const cartSubtotalSpan = document.getElementById('cart-subtotal');
+            const totalPaidSpan = document.getElementById('total-paid');
+            const remainingBalanceSpan = document.getElementById('remaining-balance');
+            const installmentsContainer = document.getElementById('installments-container');
+            const installmentsSelect = document.getElementById('installments-select');
+            const adjustStockBtn = document.getElementById('adjust-stock-btn');
+            const adjustStockModal = document.getElementById('adjust-stock-modal');
+            const closeAdjustStockBtn = document.getElementById('close-adjust-stock-btn');
+            const adjustStockCodeInput = document.getElementById('adjust-stock-code-input');
+            const scanAdjustStockBtn = document.getElementById('scan-adjust-stock-btn');
+            const adjustStockProductInfo = document.getElementById('adjust-stock-product-info');
+            const adjustStockProductName = document.getElementById('adjust-stock-product-name');
+            const adjustStockCurrentStock = document.getElementById('adjust-stock-current-stock');
+            const adjustStockControls = document.getElementById('adjust-stock-controls');
+            const adjustStockNewStock = document.getElementById('adjust-stock-new-stock');
+            const saveStockAdjustmentBtn = document.getElementById('save-stock-adjustment-btn');
+            const adjustStockScannerContainer = document.getElementById('adjust-stock-scanner-container');
+            const stockDecreaseBtn = document.getElementById('stock-decrease-btn');
+            const stockIncreaseBtn = document.getElementById('stock-increase-btn');
+            const exportDataModal = document.getElementById('export-data-modal');
+            const closeExportDataBtn = document.getElementById('close-export-data-btn');
+            const exportAllDataBtn = document.getElementById('export-all-data-btn');
+            const importFileInput = document.getElementById('import-file-input');
+            const importDataBtn = document.getElementById('import-data-btn');
+            const exportChangesBtn = document.getElementById('export-changes-btn');
+            const discount5PercentCheckbox = document.getElementById('discount-5-percent');
+            const discountCustomAmountInput = document.getElementById('discount-custom-amount');
+            const focusButtons = document.querySelectorAll('.focus-btn');
+            const editBarcodeBtn = document.getElementById('edit-barcode-btn');
+            const editBarcodeModal = document.getElementById('edit-barcode-modal');
+            const closeEditBarcodeBtn = document.getElementById('close-edit-barcode-btn');
+            const editCategorySelect = document.getElementById('edit-category');
+            const editSubcategorySelect = document.getElementById('edit-subcategory');
+            const editSubsubcategoryContainer = document.getElementById('edit-subsubcategory-container');
+            const editSubsubcategorySelect = document.getElementById('edit-subsubcategory');
+            const editProductSelect = document.getElementById('edit-product');
+            const editedProductInfo = document.getElementById('edited-product-info');
+            const editedProductName = document.getElementById('edited-product-name');
+            const editedProductCod = document.getElementById('edited-product-cod');
+            const editedProductCurrentBarcode = document.getElementById('edited-product-current-barcode');
+            const newBarcodeEditInput = document.getElementById('new-barcode-edit');
+            const scanNewBarcodeEditBtn = document.getElementById('scan-new-barcode-edit-btn');
+            const saveEditBtn = document.getElementById('save-edit-btn');
+            const editBarcodeScannerContainer = document.getElementById('edit-barcode-scanner-container');
+            const newStockPairInput = document.getElementById('new-stock-pair');
+            const newStockEditInput = document.getElementById('new-stock-edit');
+            const syncStatus = document.getElementById('sync-status');
+            const statusDot = document.getElementById('status-dot');
+            const syncBtn = document.getElementById('sync-btn');
+            const syncMessage = document.getElementById('sync-message');
+            const githubUserInput = document.getElementById('github-user');
+            const githubRepoInput = document.getElementById('github-repo');
+            const githubPatInput = document.getElementById('github-pat');
+
+            // --- LÓGICA DE HASHING ---
+            function hashPassword(password) {
+                return CryptoJS.SHA256(password).toString(CryptoJS.enc.Hex);
+            }
+
+            // --- LÓGICA DE SINCRONIZAÇÃO ---
+            function updateOnlineStatus() {
+                const isOnline = navigator.onLine;
+                if (isOnline) {
+                    syncStatus.textContent = 'Online';
+                    statusDot.classList.add('online');
+                    statusDot.classList.remove('offline');
+                    syncBtn.disabled = false;
+                    syncMessage.textContent = 'Pronto para sincronizar.';
+                    checkForUpdates();
+                } else {
+                    syncStatus.textContent = 'Offline';
+                    statusDot.classList.add('offline');
+                    statusDot.classList.remove('online');
+                    syncBtn.disabled = true;
+                    syncMessage.textContent = 'As alterações estão a ser guardadas localmente.';
+                }
+            }
+
+            async function checkForUpdates() {
+                if (!navigator.onLine) return;
+                const user = githubUserInput.value.trim();
+                const repo = githubRepoInput.value.trim();
+                if (!user || !repo) {
+                    syncMessage.textContent = 'Preencha o utilizador e repositório do GitHub.';
+                    return;
+                }
+                const GITHUB_DB_URL = GITHUB_DB_URL_TEMPLATE.replace('{user}', user).replace('{repo}', repo);
+
+                syncMessage.textContent = 'A verificar atualizações...';
+
+                try {
+                    const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
+                    if (!response.ok) throw new Error('Falha ao obter dados do GitHub.');
+                    
+                    const remoteData = await response.json();
+                    
+                    const localChanges = DB.get('change_log');
+                    const localSales = DB.get('vendas_log');
+                    
+                    if (remoteData.vendas_log.length > localSales.length && localChanges.length === 0) {
+                        syncMessage.textContent = 'Nova versão da base de dados encontrada!';
+                        showConfirm('Existe uma nova versão da base de dados online. Deseja fazer o download? (Atenção: isto irá substituir os seus dados locais)', (confirmed) => {
+                            if (confirmed) {
+                                DB.set('products', remoteData.products);
+                                DB.set('users', remoteData.users);
+                                DB.set('vendas_log', remoteData.vendas_log);
+                                DB.set('change_log', []);
+                                showAlert('Base de dados atualizada com sucesso! A aplicação será recarregada.');
+                                setTimeout(() => location.reload(), 1500);
+                            }
+                        });
+                    } else if (localChanges.length > 0) {
+                        syncMessage.textContent = 'Você tem alterações locais para enviar.';
+                        localChangesExist = true;
+                    } else {
+                        syncMessage.textContent = 'A sua base de dados está atualizada.';
+                        localChangesExist = false;
+                    }
+
+                } catch (error) {
+                    console.error('Erro ao verificar atualizações:', error);
+                    syncMessage.textContent = 'Erro ao contactar o GitHub. Verifique o nome do utilizador/repositório.';
+                }
+            }
+            
+            async function uploadChangesToGitHub() {
+                const user = githubUserInput.value.trim();
+                const repo = githubRepoInput.value.trim();
+                const pat = githubPatInput.value.trim();
+
+                if (!user || !repo || !pat) {
+                    showAlert('Por favor, preencha o utilizador, repositório e o Token de Acesso Pessoal do GitHub.');
+                    return;
+                }
+
+                if (!localChangesExist) {
+                    showAlert('Não existem alterações locais para enviar.');
+                    return;
+                }
+
+                const changesToUpload = {
+                    sales: DB.get('vendas_log'),
+                    changes: DB.get('change_log')
+                };
+
+                syncMessage.textContent = 'A enviar alterações para o GitHub Actions...';
+                syncBtn.disabled = true;
+                const GITHUB_ACTIONS_URL = GITHUB_ACTIONS_URL_TEMPLATE.replace('{user}', user).replace('{repo}', repo);
+
+                try {
+                    const response = await fetch(GITHUB_ACTIONS_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Authorization': `token ${pat}`
+                        },
+                        body: JSON.stringify({
+                            ref: 'main',
+                            inputs: {
+                                changes: JSON.stringify(changesToUpload)
+                            }
+                        })
+                    });
+
+                    if (response.status !== 204) {
+                        throw new Error(`O GitHub respondeu com o status ${response.status}. Verifique as suas credenciais e o nome do repositório.`);
+                    }
+                    
+                    showAlert('Pedido de atualização enviado com sucesso para o GitHub Actions! Aguarde alguns minutos para que a base de dados seja atualizada.');
+                    syncMessage.textContent = 'Pedido enviado. A base de dados será atualizada em breve.';
+                    DB.set('change_log', []);
+                    localChangesExist = false;
+
+                } catch (error) {
+                    console.error('Erro no upload:', error);
+                    showAlert(`Ocorreu um erro ao enviar as alterações: ${error.message}`);
+                    syncMessage.textContent = 'Falha no envio. Tente novamente.';
+                } finally {
+                    syncBtn.disabled = false;
+                }
+            }
+
+            function initializeApp() {
+                if (localStorage.getItem('db_initialized')) {
+                    setupView.classList.add('hidden');
+                    checkLoggedInState();
+                } else {
+                    setupView.classList.remove('hidden');
+                    loginView.classList.add('hidden');
+                    appView.classList.add('hidden');
+                    setupDatabaseLoadListeners();
+                }
+            }
+            
+            function setupDatabaseLoadListeners() {
+                const loadDatabaseInput = document.getElementById('load-database-input');
+                const startLoadBtn = document.getElementById('start-load-btn');
+                const fileSelectionStatus = document.getElementById('file-selection-status');
+                const setupError = document.getElementById('setup-error');
+                let selectedFile = null;
+
+                loadDatabaseInput.addEventListener('change', (event) => {
+                    selectedFile = event.target.files[0];
+                    if (selectedFile && selectedFile.type === "application/json") {
+                        fileSelectionStatus.textContent = `Ficheiro selecionado: ${selectedFile.name}`;
+                        startLoadBtn.disabled = false;
+                        startLoadBtn.classList.remove('hidden');
+                        setupError.textContent = '';
+                    } else {
+                        fileSelectionStatus.textContent = 'Por favor, selecione um ficheiro .json válido.';
+                        startLoadBtn.disabled = true;
+                        startLoadBtn.classList.add('hidden');
+                        selectedFile = null;
+                    }
+                });
+
+                startLoadBtn.addEventListener('click', () => {
+                    if (!selectedFile) return;
+
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const data = JSON.parse(e.target.result);
+                            if (data.products && data.users) {
+                                DB.set('products', data.products);
+                                DB.set('users', data.users);
+                                DB.set('vendas_log', data.vendas_log || []);
+                                DB.set('change_log', []); // Initialize change log
+                                localStorage.setItem('db_initialized', 'true');
+                                
+                                setupView.classList.add('hidden');
+                                showLoginView();
+                            } else {
+                                setupError.textContent = 'Ficheiro JSON inválido. A estrutura esperada é { "products": [...], "users": [...] }.';
+                            }
+                        } catch (err) {
+                            setupError.textContent = `Erro ao processar o ficheiro: ${err.message}`;
+                        }
+                    };
+                    reader.readAsText(selectedFile);
+                });
+            }
+
+            function checkLoggedInState() {
+                let savedUser = localStorage.getItem('loggedInUser') || sessionStorage.getItem('loggedInUser');
+                if (savedUser) {
+                    currentUser = JSON.parse(savedUser);
+                    showAppView();
+                } else {
+                    showLoginView();
+                }
+            }
+
+            function showLoginView() {
+                appView.classList.add('hidden');
+                loginView.classList.remove('hidden');
+                usernameInput.value = '';
+                passwordInput.value = '';
+            }
+
+            function login() {
+                const username = usernameInput.value.trim();
+                const password = passwordInput.value;
+                const hashedPassword = hashPassword(password);
+                loginError.textContent = '';
+                if (!username || !password) {
+                    loginError.textContent = 'Utilizador e senha são obrigatórios.';
+                    return;
+                }
+                
+                const users = DB.get('users');
+                const user = users.find(u => u.username === username && u.password === hashedPassword);
+
+                if (user) {
+                    if (keepLoggedInCheckbox.checked) {
+                        localStorage.setItem('loggedInUser', JSON.stringify(user));
+                    } else {
+                        sessionStorage.setItem('loggedInUser', JSON.stringify(user));
+                    }
+                    currentUser = user;
+                    showAppView();
+                } else {
+                    loginError.textContent = 'Utilizador ou senha inválidos.';
+                }
+            }
+
+            function logout() {
+                currentUser = null;
+                localStorage.removeItem('loggedInUser');
+                sessionStorage.removeItem('loggedInUser');
+                showLoginView();
+            }
+
+            function showAppView() {
+                loginView.classList.add('hidden');
+                appView.classList.remove('hidden');
+                currentUserInfo.textContent = `${currentUser.username} (${currentUser.role})`;
+                if (currentUser.role === 'admin') {
+                    adminTabBtn.classList.remove('hidden');
+                    historyUserFilterContainer.classList.remove('hidden');
+                    populateUserFilter();
+                } else {
+                    adminTabBtn.classList.add('hidden');
+                    historyUserFilterContainer.classList.add('hidden');
+                }
+                switchTab('vender-view');
+                startNewSale();
+            }
+            
+            function switchTab(tabId) {
+                tabContents.forEach(content => content.classList.add('hidden'));
+                tabButtons.forEach(button => button.classList.remove('tab-active'));
+                document.getElementById(tabId).classList.remove('hidden');
+                document.querySelector(`[data-tab="${tabId}"]`).classList.add('tab-active');
+                if (tabId === 'historico-view') {
+                    historyDateInput.valueAsDate = new Date();
+                    showHistory();
+                }
+            }
+
+            function lookupProduct(identifier) {
+                if (!identifier) return;
+                const products = DB.get('products');
+                const product = products.find(p => p.cod === identifier || p.barcode === identifier);
+                const foundControls = document.getElementById('product-found-controls');
+                const notFoundControls = document.getElementById('product-not-found-controls');
+                const registerNewProductLink = document.getElementById('register-new-product-link');
+                const notFoundMessage = document.getElementById('product-not-found-message');
+
+                if (product) {
+                    currentProduct = product;
+                    productName.textContent = product.name;
+                    productPrice.textContent = `R$ ${product.price.toFixed(2)}`;
+                    currentQuantity = 1;
+                    productQuantitySpan.textContent = currentQuantity;
+                    foundControls.classList.remove('hidden');
+                    notFoundControls.classList.add('hidden');
+                } else {
+                    currentProduct = null;
+                    foundControls.classList.add('hidden');
+                    notFoundControls.classList.remove('hidden');
+                    if (currentUser.role === 'admin') {
+                        notFoundMessage.textContent = 'Produto não encontrado. Deseja registá-lo?';
+                        registerNewProductLink.classList.remove('hidden');
+                    } else {
+                        notFoundMessage.textContent = 'Produto não encontrado.';
+                        registerNewProductLink.classList.add('hidden');
+                    }
+                }
+                productInfo.classList.remove('hidden');
+            }
+
+            function addToCart() {
+                if (currentProduct) {
+                    const existingItem = currentCart.find(item => item.cod === currentProduct.cod);
+                    if (existingItem) {
+                        existingItem.quantity += currentQuantity;
+                    } else {
+                        currentCart.push({ ...currentProduct, quantity: currentQuantity });
+                    }
+                    updateCartUI();
+                    resetProductLookup();
+                }
+            }
+
+            function resetProductLookup() {
+                currentProduct = null;
+                codeInput.value = '';
+                productInfo.classList.add('hidden');
+                document.getElementById('product-found-controls').classList.add('hidden');
+                document.getElementById('product-not-found-controls').classList.add('hidden');
+            }
+
+            function removeFromCart(code) {
+                currentCart = currentCart.filter(item => item.cod !== code);
+                updateCartUI();
+            }
+
+            function updateCartUI() {
+                if (currentCart.length === 0) {
+                    cartItems.innerHTML = '<p class="text-gray-500 text-center">Carrinho vazio</p>';
+                } else {
+                    cartItems.innerHTML = '';
+                    currentCart.forEach(item => {
+                        const itemElement = document.createElement('div');
+                        itemElement.className = 'relative flex justify-between items-center p-2 bg-gray-50 rounded';
+                        itemElement.innerHTML = `
+                            <div><p class="font-medium text-sm">${item.name}</p><p class="text-xs text-gray-600">${item.quantity} x R$ ${item.price.toFixed(2)}</p></div>
+                            <p class="font-semibold text-sm">R$ ${(item.quantity * item.price).toFixed(2)}</p>
+                            <button class="remove-from-cart-btn absolute top-0 right-0 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs" data-code="${item.cod}">&times;</button>`;
+                        cartItems.appendChild(itemElement);
+                    });
+                }
+                updateSaleTotals();
+            }
+
+            function addPayment() {
+                const method = paymentMethodSelect.value;
+                const amount = parseFloat(paymentAmountInput.value);
+                if (isNaN(amount) || amount <= 0) {
+                    showAlert('Por favor, insira um valor de pagamento válido.');
+                    return;
+                }
+                const payment = { method, amount };
+                if (method === 'Cartão de Crédito') {
+                    payment.installments = installmentsSelect.value;
+                }
+                currentPayments.push(payment);
+                paymentAmountInput.value = '';
+                updatePaymentsUI();
+                updateSaleTotals();
+            }
+
+            function removePayment(index) {
+                currentPayments.splice(index, 1);
+                updatePaymentsUI();
+                updateSaleTotals();
+            }
+
+            function updatePaymentsUI() {
+                paymentEntries.innerHTML = '';
+                currentPayments.forEach((payment, index) => {
+                    const paymentElement = document.createElement('div');
+                    paymentElement.className = 'flex justify-between items-center p-2 bg-gray-100 rounded text-sm';
+                    let paymentText = payment.method;
+                    if (payment.installments) {
+                        paymentText += ` (${payment.installments})`;
+                    }
+                    paymentElement.innerHTML = `
+                        <div><span class="font-medium">${paymentText}</span></div>
+                        <div class="flex items-center gap-2"><span class="font-semibold">R$ ${payment.amount.toFixed(2)}</span><button class="remove-payment-btn w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs" data-index="${index}">&times;</button></div>`;
+                    paymentEntries.appendChild(paymentElement);
+                });
+            }
+
+            function updateSaleTotals() {
+                const subtotal = currentCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                let discount = 0;
+                const customDiscountValue = parseFloat(discountCustomAmountInput.value);
+
+                if (discount5PercentCheckbox.checked) {
+                    discount = subtotal * 0.05;
+                } else if (!isNaN(customDiscountValue) && customDiscountValue > 0) {
+                    discount = customDiscountValue;
+                }
+
+                if (discount > subtotal) {
+                    discount = subtotal;
+                }
+
+                let finalTotal = subtotal - discount;
+                
+                cartSubtotalSpan.textContent = `R$ ${subtotal.toFixed(2)}`;
+                if (discount > 0) {
+                    discountAmountSpan.textContent = `- R$ ${discount.toFixed(2)}`;
+                    discountInfo.classList.remove('hidden');
+                } else {
+                    discountInfo.classList.add('hidden');
+                }
+
+                const totalPaid = currentPayments.reduce((sum, p) => sum + p.amount, 0);
+                const remaining = finalTotal - totalPaid;
+                
+                cartTotal.textContent = `R$ ${finalTotal.toFixed(2)}`;
+                totalPaidSpan.textContent = `R$ ${totalPaid.toFixed(2)}`;
+                remainingBalanceSpan.textContent = `R$ ${remaining.toFixed(2)}`;
+                remainingBalanceSpan.classList.toggle('text-red-600', remaining > 0.01);
+                remainingBalanceSpan.classList.toggle('text-green-600', remaining <= 0.01);
+                
+                const isFullyPaid = Math.abs(remaining) < 0.01;
+                finalizeSaleBtn.disabled = currentCart.length === 0 || !isFullyPaid;
+            }
+
+            function finalizeSale() {
+                if (currentCart.length === 0 || currentPayments.length === 0) return;
+                
+                const subtotal = currentCart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                let discount = 0;
+                const customDiscountValue = parseFloat(discountCustomAmountInput.value);
+                if (discount5PercentCheckbox.checked) {
+                    discount = subtotal * 0.05;
+                } else if (!isNaN(customDiscountValue) && customDiscountValue > 0) {
+                    discount = customDiscountValue;
+                }
+                if (discount > subtotal) discount = subtotal;
+
+                const finalTotal = subtotal - discount;
+
+                const vendasLog = DB.get('vendas_log');
+                const saleData = {
+                    timestamp: new Date().toISOString(),
+                    vendedor: currentUser.username,
+                    produtos: currentCart.map(item => `${item.quantity}x ${item.name}`).join(', '),
+                    formas_pagamento: currentPayments.map(p => p.method).join(', '),
+                    valores_pagos: currentPayments.map(p => p.amount.toFixed(2)).join(', '),
+                    desconto: discount.toFixed(2),
+                    valor_total: finalTotal.toFixed(2)
+                };
+                vendasLog.push(saleData);
+                DB.set('vendas_log', vendasLog);
+                
+                let products = DB.get('products');
+                currentCart.forEach(cartItem => {
+                    const productIndex = products.findIndex(p => p.cod === cartItem.cod);
+                    if (productIndex !== -1 && products[productIndex].estoque != null) {
+                        products[productIndex].estoque -= cartItem.quantity;
+                    }
+                });
+                DB.set('products', products);
+                
+                showAlert('Venda finalizada e guardada localmente!');
+                startNewSale();
+            }
+
+            function startNewSale() {
+                currentCart = [];
+                currentPayments = [];
+                discount5PercentCheckbox.checked = false;
+                discountCustomAmountInput.value = '';
+                updateCartUI();
+                updatePaymentsUI();
+                resetProductLookup();
+            }
+
+            function populateUserFilter() {
+                const users = DB.get('users');
+                historyUserFilter.innerHTML = '<option value="all">Todos os Funcionários</option>';
+                users.forEach(user => {
+                    const option = document.createElement('option');
+                    option.value = user.username;
+                    option.textContent = `${user.username} (${user.role})`;
+                    historyUserFilter.appendChild(option);
+                });
+            }
+
+            function showHistory() {
+                const selectedDate = historyDateInput.value;
+                let allSales = DB.get('vendas_log');
+                
+                if (selectedDate) {
+                    allSales = allSales.filter(sale => sale.timestamp.startsWith(selectedDate));
+                }
+
+                if (currentUser.role !== 'admin') {
+                    allSales = allSales.filter(sale => sale.vendedor === currentUser.username);
+                } else {
+                    const selectedUser = historyUserFilter.value;
+                    if (selectedUser !== 'all') {
+                        allSales = allSales.filter(sale => sale.vendedor === selectedUser);
+                    }
+                }
+                
+                allSales.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                historyContent.innerHTML = '';
+                let totalSalesValue = 0;
+
+                if (allSales.length === 0) {
+                    historyContent.innerHTML = '<p class="text-gray-500">Nenhuma venda registada para esta data/filtro.</p>';
+                } else {
+                    allSales.forEach(sale => {
+                        totalSalesValue += parseFloat(sale.valor_total);
+                        const saleElement = document.createElement('div');
+                        saleElement.className = 'p-3 border rounded-lg bg-gray-50';
+                        const saleTimestamp = new Date(sale.timestamp);
+                        const discountHtml = sale.desconto > 0 ? `<div class="text-xs text-green-600 mt-1">Desconto: - R$ ${parseFloat(sale.desconto).toFixed(2)}</div>` : '';
+                        
+                        saleElement.innerHTML = `
+                            <div class="flex justify-between font-semibold text-sm">
+                                <p>${saleTimestamp.toLocaleDateString('pt-BR')} ${saleTimestamp.toLocaleTimeString('pt-BR')}</p>
+                                <p>Total: R$ ${parseFloat(sale.valor_total).toFixed(2)}</p>
+                            </div>
+                            <div class="text-xs text-gray-600 mt-1"><span>Vendedor: ${sale.vendedor}</span></div>
+                            ${discountHtml}
+                            <div class="mt-2 text-xs">
+                                <p class="font-semibold mb-1">Pagamentos: ${sale.formas_pagamento} (${sale.valores_pagos})</p>
+                            </div>
+                            <div class="mt-2 text-xs">
+                                <p class="font-semibold mb-1">Itens:</p>
+                                <p>${sale.produtos}</p>
+                            </div>`;
+                        historyContent.appendChild(saleElement);
+                    });
+                }
+                historyTotalSpan.textContent = `R$ ${totalSalesValue.toFixed(2)}`;
+            }
+            
+            function logChange(action, details) {
+                const log = DB.get('change_log');
+                log.push({
+                    user: currentUser.username,
+                    action: action,
+                    timestamp: new Date().toISOString(),
+                    details: details
+                });
+                DB.set('change_log', log);
+            }
+
+            function addNewProduct(event) {
+                event.preventDefault();
+                stopScanner();
+                const cod = document.getElementById('new-cod').value.trim();
+                const name = document.getElementById('new-product-name').value.trim();
+                const price = parseFloat(document.getElementById('new-product-price').value);
+                const barcode = document.getElementById('new-barcode').value.trim();
+                const category = document.getElementById('new-category').value.trim();
+                const subcategory = document.getElementById('new-subcategory').value.trim();
+                const subsubcategory = document.getElementById('new-subsubcategory').value.trim();
+                const estoque = parseInt(document.getElementById('new-estoque').value, 10) || null;
+                if (!cod || !name || isNaN(price) || price <= 0) {
+                    showAlert('Por favor, preencha os campos obrigatórios (Código, Nome, Preço) corretamente.');
+                    return;
+                }
+                let products = DB.get('products');
+                if (products.some(p => p.cod === cod)) {
+                    showAlert('Já existe um produto com este código.');
+                    return;
+                }
+                const newProduct = { cod, name, price, barcode, category, subcategory, subsubcategory, estoque, prc_total: null };
+                products.push(newProduct);
+                DB.set('products', products);
+                logChange('create_product', { cod: newProduct.cod, name: newProduct.name });
+                showAlert('Produto registado com sucesso localmente.');
+                addProductForm.reset();
+                addProductModal.classList.add('hidden');
+            }
+
+            function saveProductPairing(cod, newBarcode, stock, modal, refreshCallback) {
+                if(!cod || !newBarcode) {
+                    showAlert('Selecione um produto e forneça um novo código de barras.');
+                    return;
+                }
+                let products = DB.get('products');
+                const productIndex = products.findIndex(p => p.cod === cod);
+                if (productIndex === -1) {
+                    showAlert('Produto não encontrado para casar o código.');
+                    return;
+                }
+                
+                products[productIndex].barcode = newBarcode;
+                
+                const newStock = parseInt(stock, 10);
+                if (!isNaN(newStock)) {
+                    products[productIndex].estoque = newStock;
+                }
+
+                DB.set('products', products);
+                logChange('pair_product', { cod: cod, newBarcode: newBarcode, newStock: newStock });
+                showAlert('Código de barras e estoque atualizados com sucesso!');
+                
+                refreshCallback();
+            }
+
+            function saveStockAdjustment() {
+                if (!productForStockAdjustment) return;
+                const newStock = parseInt(adjustStockNewStock.value, 10);
+                if (isNaN(newStock) || newStock < 0) {
+                    showAlert('Por favor, insira um valor de estoque válido.');
+                    return;
+                }
+                let products = DB.get('products');
+                const productIndex = products.findIndex(p => p.cod === productForStockAdjustment.cod);
+                if (productIndex === -1) {
+                    showAlert('Produto não encontrado para ajustar o estoque.');
+                    return;
+                }
+                const oldStock = products[productIndex].estoque;
+                products[productIndex].estoque = newStock;
+                DB.set('products', products);
+                logChange('adjust_stock', { cod: productForStockAdjustment.cod, oldStock: oldStock, newStock: newStock });
+                showAlert('Estoque atualizado com sucesso localmente!');
+                adjustStockModal.classList.add('hidden');
+            }
+
+            function addNewUser(event) {
+                event.preventDefault();
+                const newUsername = document.getElementById('new-username').value.trim();
+                const newPassword = document.getElementById('new-password').value.trim();
+                const newRole = document.getElementById('new-role').value;
+                if (!newUsername || !newPassword) {
+                    showAlert('Nome de utilizador e senha são obrigatórios.');
+                    return;
+                }
+                let users = DB.get('users');
+                if (users.some(u => u.username === newUsername)) {
+                    showAlert('Já existe um utilizador com este nome.');
+                    return;
+                }
+
+                const hashedPassword = hashPassword(newPassword);
+                users.push({ username: newUsername, password: hashedPassword, role: newRole });
+                DB.set('users', users);
+                logChange('create_user', { username: newUsername, role: newRole, password: hashedPassword });
+                showAlert('Utilizador registado com sucesso localmente.');
+                addUserForm.reset();
+                addUserModal.classList.add('hidden');
+                if (document.querySelector('.tab-active').dataset.tab === 'historico-view') {
+                    populateUserFilter();
+                }
+            }
+            
+            function exportSalesToCSV() {
+                const sales = DB.get('vendas_log');
+                if (sales.length === 0) {
+                    showAlert("Nenhuma venda para exportar.");
+                    return;
+                }
+                let csvContent = "data:text/csv;charset=utf-8,";
+                csvContent += "Data e Hora;Vendedor;Produtos;Formas de Pagamento;Valores Pagos;Desconto;Valor Total\r\n";
+                sales.forEach(sale => {
+                    let row = `"${sale.timestamp}";"${sale.vendedor}";"${sale.produtos}";"${sale.formas_pagamento}";"${sale.valores_pagos}";"${sale.desconto}";"${sale.valor_total}"`;
+                    csvContent += row + "\r\n";
+                });
+                const encodedUri = encodeURI(csvContent);
+                const link = document.createElement("a");
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `relatorio_vendas_${new Date().toISOString().slice(0, 10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+            
+            function exportAllData() {
+                const allData = { 
+                    products: DB.get('products'), 
+                    users: DB.get('users'), 
+                    vendas_log: DB.get('vendas_log'), 
+                    change_log: DB.get('change_log') 
+                };
+                const jsonString = JSON.stringify(allData, null, 2);
+                const blob = new Blob([jsonString], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `backup_dados_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                showAlert('Backup de dados exportado com sucesso!');
+            }
+
+            function importAllData(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    try {
+                        const data = JSON.parse(e.target.result);
+                        if (data.products && data.users) {
+                            showConfirm("Tem a certeza que deseja substituir todos os dados locais por este backup?", (confirmed) => {
+                                if (confirmed) {
+                                    DB.set('products', data.products);
+                                    DB.set('users', data.users);
+                                    DB.set('vendas_log', data.vendas_log || []);
+                                    DB.set('change_log', data.change_log || []);
+                                    localStorage.setItem('db_initialized', 'true');
+                                    showAlert('Dados importados com sucesso! A aplicação será recarregada.');
+                                    setTimeout(() => location.reload(), 1500);
+                                }
+                            });
+                        } else {
+                            showAlert('Arquivo de backup inválido.');
+                        }
+                    } catch (err) {
+                        showAlert(`Erro ao ler o arquivo: ${err.message}`);
+                    }
+                };
+                reader.readAsText(file);
+            }
+
+            function exportUserChanges() {
+                const userSales = DB.get('vendas_log').filter(s => s.vendedor === currentUser.username);
+                const userChanges = DB.get('change_log').filter(c => c.user === currentUser.username);
+
+                if (userSales.length === 0 && userChanges.length === 0) {
+                    showAlert('Nenhuma mudança ou venda encontrada para este utilizador.');
+                    return;
+                }
+
+                const exportData = {
+                    exportedBy: currentUser.username,
+                    exportDate: new Date().toISOString(),
+                    sales: userSales,
+                    changes: userChanges
+                };
+
+                const jsonString = JSON.stringify(exportData, null, 2);
+                const blob = new Blob([jsonString], {type: "application/json"});
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `mudancas_${currentUser.username}_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
+            function openBarcodeModal(modal, categorySelect, onlyUnpaired) {
+                const subcategorySelect = modal.querySelector('select[id*="-subcategory"]');
+                const subsubcategorySelect = modal.querySelector('select[id*="-subsubcategory"]');
+                const productSelect = modal.querySelector('select[id*="-product"]');
+                
+                categorySelect.innerHTML = '<option value="">-- Escolha --</option>';
+                subcategorySelect.innerHTML = '<option value="">-- Escolha --</option>';
+                subsubcategorySelect.innerHTML = '<option value="">-- Escolha --</option>';
+                productSelect.innerHTML = '<option value="">-- Escolha --</option>';
+
+                const products = DB.get('products');
+                const categories = [...new Set(products.map(p => p.category).filter(Boolean))].sort();
+                categories.forEach(cat => {
+                    const option = document.createElement('option');
+                    option.value = cat;
+                    option.textContent = cat;
+                    categorySelect.appendChild(option);
+                });
+                modal.classList.remove('hidden');
+            }
+            
+            function populateSubcategoriesFor(categorySelect, subcategorySelect, subsubcategorySelect, productSelect, productList, onlyUnpaired) {
+                const selectedCategory = categorySelect.value;
+                subcategorySelect.innerHTML = '<option value="">-- Escolha --</option>';
+                subsubcategorySelect.innerHTML = '<option value="">-- Escolha --</option>';
+                productSelect.innerHTML = '<option value="">-- Escolha --</option>';
+                if (!selectedCategory) return;
+
+                const products = DB.get('products');
+                const subcategories = [...new Set(products.filter(p => p.category === selectedCategory && p.subcategory).map(p => p.subcategory))].sort();
+                subcategories.forEach(sub => {
+                    const option = document.createElement('option');
+                    option.value = sub;
+                    option.textContent = sub;
+                    subcategorySelect.appendChild(option);
+                });
+                subcategorySelect.disabled = false;
+            }
+
+            function populateSubsubcategoriesFor(categorySelect, subcategorySelect, subsubcategorySelect, productSelect, productList, onlyUnpaired) {
+                const selectedCategory = categorySelect.value;
+                const selectedSubcategory = subcategorySelect.value;
+                const subsubcategoryContainer = subsubcategorySelect.closest('div');
+                
+                subsubcategorySelect.innerHTML = '<option value="">-- Escolha --</option>';
+                productSelect.innerHTML = '<option value="">-- Escolha --</option>';
+                if (!selectedSubcategory) return;
+
+                const products = DB.get('products');
+                const subsubcategories = [...new Set(products.filter(p => p.category === selectedCategory && p.subcategory === selectedSubcategory && p.subsubcategory).map(p => p.subsubcategory))].sort();
+                
+                if (subsubcategories.length > 0) {
+                    subsubcategoryContainer.classList.remove('hidden');
+                    subsubcategorySelect.disabled = false;
+                    subsubcategorySelect.innerHTML = '<option value="">-- Produtos sem Sub-Subcategoria --</option>';
+                    subsubcategories.forEach(subsub => {
+                        const option = document.createElement('option');
+                        option.value = subsub;
+                        option.textContent = subsub;
+                        subsubcategorySelect.appendChild(option);
+                    });
+                } else {
+                    subsubcategoryContainer.classList.add('hidden');
+                    populateProductsFor(categorySelect, subcategorySelect, subsubcategorySelect, productSelect, productList, onlyUnpaired);
+                }
+            }
+
+            function populateProductsFor(categorySelect, subcategorySelect, subsubcategorySelect, productSelect, productListRef, onlyUnpaired) {
+                const selectedCategory = categorySelect.value;
+                const selectedSubcategory = subcategorySelect.value;
+                const selectedSubsubcategory = subsubcategorySelect.value || null;
+                if (!selectedCategory || !selectedSubcategory) return;
+
+                let products = DB.get('products');
+                let filteredProducts = products.filter(p => 
+                    p.category === selectedCategory && 
+                    p.subcategory === selectedSubcategory && 
+                    (selectedSubsubcategory ? p.subsubcategory === selectedSubsubcategory : !p.subsubcategory)
+                );
+
+                if (onlyUnpaired) {
+                    filteredProducts = filteredProducts.filter(p => !p.barcode);
+                }
+                
+                if (productListRef === 'pair') pairableProductsList = filteredProducts;
+                else editableProductsList = filteredProducts;
+
+                productSelect.innerHTML = '<option value="">-- Escolha --</option>';
+                filteredProducts.sort((a, b) => a.name.localeCompare(b.name)).forEach(prod => {
+                    const option = document.createElement('option');
+                    option.value = prod.cod;
+                    option.textContent = prod.name;
+                    productSelect.appendChild(option);
+                });
+                productSelect.disabled = false;
+            }
+
+            function showSelectedProductInfoFor(productSelect, productInfo, productList, stockInput) {
+                const selectedCod = productSelect.value;
+                const nameEl = productInfo.querySelector('[id*="-name"]');
+                const codEl = productInfo.querySelector('[id*="-cod"]');
+                const barcodeEl = productInfo.querySelector('[id*="-current-barcode"]');
+                const saveBtn = productSelect.closest('.space-y-4').querySelector('button[id*="save-"]');
+
+                if (!selectedCod) {
+                    productInfo.classList.add('hidden');
+                    saveBtn.disabled = true;
+                    return;
+                }
+                const product = productList.find(p => p.cod === selectedCod);
+                if (product) {
+                    nameEl.textContent = product.name;
+                    codEl.textContent = `Cód: ${product.cod}`;
+                    barcodeEl.textContent = `Barcode Atual: ${product.barcode || 'Nenhum'}`;
+                    stockInput.value = product.estoque || '';
+                    productInfo.classList.remove('hidden');
+                    saveBtn.disabled = false;
+                }
+            }
+
+            function openAdjustStockModal() {
+                productForStockAdjustment = null;
+                adjustStockCodeInput.value = '';
+                adjustStockProductInfo.classList.add('hidden');
+                adjustStockControls.classList.add('hidden');
+                adjustStockNewStock.value = '';
+                saveStockAdjustmentBtn.disabled = true;
+                adjustStockModal.classList.remove('hidden');
+            }
+
+            function lookupProductForStock(identifier) {
+                if (!identifier) return;
+                const products = DB.get('products');
+                productForStockAdjustment = products.find(p => p.cod === identifier || p.barcode === identifier);
+                if (productForStockAdjustment) {
+                    adjustStockProductName.textContent = productForStockAdjustment.name;
+                    adjustStockCurrentStock.textContent = productForStockAdjustment.estoque ?? 'N/A';
+                    adjustStockNewStock.value = productForStockAdjustment.estoque ?? 0;
+                    adjustStockProductInfo.classList.remove('hidden');
+                    adjustStockControls.classList.remove('hidden');
+                    saveStockAdjustmentBtn.disabled = false;
+                } else {
+                    showAlert('Produto não encontrado.');
+                    productForStockAdjustment = null;
+                    adjustStockProductInfo.classList.add('hidden');
+                    adjustStockControls.classList.add('hidden');
+                    saveStockAdjustmentBtn.disabled = true;
+                }
+            }
+
+            async function requestCameraPermission(target) {
+                scannerTargetInput = target;
+                if (!navigator.mediaDevices?.getUserMedia) {
+                    return showAlert('O seu navegador não suporta o acesso à câmara.');
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    stream.getTracks().forEach(track => track.stop());
+
+                    const modal = target.closest('.modal-bg, #app-view');
+                    const viewport = modal.querySelector('.scanner-viewport');
+                    const scannerContainer = modal.querySelector('.scanner-container');
+
+                    if (modal.id === 'app-view') {
+                        scannerModal.classList.remove('hidden');
+                        startScanner('#scanner-viewport');
+                    } else {
+                         if (scannerContainer) {
+                            scannerContainer.classList.remove('hidden');
+                        }
+                        startScanner(`#${viewport.id}`);
+                    }
+
+                } catch (error) {
+                    let msg = 'A permissão da câmara é necessária.';
+                    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                        msg = 'Você negou o acesso à câmara. Habilite nas configurações do seu navegador.';
+                    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                        msg = 'Nenhuma câmara foi encontrada no seu dispositivo.';
+                    }
+                    showAlert(msg);
+                    console.error("Camera Error:", error);
+                }
+            }
+            
+            function triggerFocus() {
+                if (Quagga && isScannerActive) {
+                    try {
+                        const track = Quagga.CameraAccess.getActiveTrack();
+                        if (track && typeof track.applyConstraints === 'function') {
+                            track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+                                .then(() => console.log('Autofoco acionado.'))
+                                .catch(e => console.error('Este dispositivo não suporta o controlo de foco.', e));
+                        }
+                    } catch (e) {
+                        console.error('Erro ao obter a faixa da câmara:', e);
+                    }
+                }
+            }
+
+            function startScanner(viewportSelector) {
+                Quagga.init({
+                    inputStream: { name: "Live", type: "LiveStream", target: document.querySelector(viewportSelector), constraints: { facingMode: "environment" } },
+                    locator: { patchSize: "medium", halfSample: true },
+                    numOfWorkers: navigator.hardwareConcurrency || 4,
+                    decoder: { readers: ["ean_reader", "upc_reader", "code_128_reader"], multiple: false },
+                    locate: true
+                }, (err) => {
+                    if (err) { showAlert('Erro ao iniciar a câmara.'); return; }
+                    Quagga.start();
+                    isScannerActive = true;
+                    const container = document.querySelector(viewportSelector).closest('.modal-bg, .scanner-container');
+                    if (container) {
+                        const focusBtn = container.querySelector('.focus-btn');
+                        if (focusBtn) focusBtn.classList.remove('hidden');
+                    }
+                });
+            }
+
+            function stopScanner() {
+                if (isScannerActive) {
+                    Quagga.stop();
+                    isScannerActive = false;
+                }
+                [scannerModal, addProductScannerContainer, pairProductScannerContainer, adjustStockScannerContainer, editBarcodeScannerContainer].forEach(el => el.classList.add('hidden'));
+                focusButtons.forEach(btn => btn.classList.add('hidden'));
+            }
+
+            Quagga.onDetected((result) => {
+                if (result?.codeResult?.code) {
+                    const code = result.codeResult.code.replace(/\s/g, ''); // Remove espaços do código
+                    if (scannerTargetInput) {
+                        scannerTargetInput.value = code;
+                        if (scannerTargetInput.id === 'code-input') {
+                           lookupProduct(code);
+                        } else if (scannerTargetInput.id === 'adjust-stock-code-input') {
+                           lookupProductForStock(code);
+                        }
+                    }
+                    if ('vibrate' in navigator) navigator.vibrate(100);
+                    stopScanner();
+                }
+            });
+
+            // --- EVENT LISTENERS ---
+            loginBtn.addEventListener('click', login);
+            passwordInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') login(); });
+            logoutBtnConfig.addEventListener('click', logout);
+            codeInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') lookupProduct(codeInput.value.trim()); });
+            scanCodeBtn.addEventListener('click', () => requestCameraPermission(document.getElementById('code-input')));
+            scanNewCodeBtn.addEventListener('click', () => requestCameraPermission(document.getElementById('new-cod')));
+            addToCartBtn.addEventListener('click', addToCart);
+            finalizeSaleBtn.addEventListener('click', finalizeSale);
+            clearCartBtn.addEventListener('click', () => { if (currentCart.length > 0) showConfirm("Limpar o carrinho e pagamentos?", (c) => c && startNewSale()); else startNewSale(); });
+            exportSalesBtn.addEventListener('click', exportSalesToCSV);
+            exportDataBtn.addEventListener('click', () => exportDataModal.classList.remove('hidden'));
+            closeExportDataBtn.addEventListener('click', () => exportDataModal.classList.add('hidden'));
+            exportAllDataBtn.addEventListener('click', exportAllData);
+            importFileInput.addEventListener('change', (e) => { importDataBtn.disabled = !e.target.files.length; });
+            importDataBtn.addEventListener('click', () => importAllData({ target: importFileInput }));
+            exportChangesBtn.addEventListener('click', exportUserChanges);
+            document.getElementById('register-new-product-link').addEventListener('click', () => {
+                const code = codeInput.value.trim();
+                addProductModal.classList.remove('hidden');
+                document.getElementById('new-cod').value = code;
+                document.getElementById('new-barcode').value = code;
+                resetProductLookup();
+            });
+            closeAlertBtn.addEventListener('click', () => alertModal.classList.add('hidden'));
+            closeScannerBtn.addEventListener('click', stopScanner);
+            addProductBtn.addEventListener('click', () => addProductModal.classList.remove('hidden'));
+            closeAddProductBtn.addEventListener('click', () => { stopScanner(); addProductModal.classList.add('hidden'); });
+            addUserBtn.addEventListener('click', () => addUserModal.classList.remove('hidden'));
+            closeAddUserBtn.addEventListener('click', () => addUserModal.classList.add('hidden'));
+            addProductForm.addEventListener('submit', addNewProduct);
+            addUserForm.addEventListener('submit', addNewUser);
+            historyDateInput.addEventListener('change', showHistory);
+            historyUserFilter.addEventListener('change', showHistory);
+            cancelAddBtn.addEventListener('click', resetProductLookup);
+            increaseQtyBtn.addEventListener('click', () => { currentQuantity++; productQuantitySpan.textContent = currentQuantity; });
+            decreaseQtyBtn.addEventListener('click', () => { if (currentQuantity > 1) { currentQuantity--; productQuantitySpan.textContent = currentQuantity; } });
+            cartItems.addEventListener('click', (e) => { if (e.target.classList.contains('remove-from-cart-btn')) removeFromCart(e.target.dataset.code); });
+            tabButtons.forEach(button => button.addEventListener('click', () => switchTab(button.dataset.tab)));
+            addPaymentBtn.addEventListener('click', addPayment);
+            paymentEntries.addEventListener('click', (e) => { if (e.target.classList.contains('remove-payment-btn')) removePayment(parseInt(e.target.dataset.index, 10)); });
+            paymentMethodSelect.addEventListener('change', () => installmentsContainer.classList.toggle('hidden', paymentMethodSelect.value !== 'Cartão de Crédito'));
+            
+            pairProductBtn.addEventListener('click', () => openBarcodeModal(pairProductModal, pairCategorySelect, true));
+            editBarcodeBtn.addEventListener('click', () => openBarcodeModal(editBarcodeModal, editCategorySelect, false));
+            
+            closePairProductBtn.addEventListener('click', () => { stopScanner(); pairProductModal.classList.add('hidden'); });
+            closeEditBarcodeBtn.addEventListener('click', () => { stopScanner(); editBarcodeModal.classList.add('hidden'); });
+            
+            pairCategorySelect.addEventListener('change', () => populateSubcategoriesFor(pairCategorySelect, pairSubcategorySelect, pairSubsubcategorySelect, pairProductSelect, 'pair', true));
+            pairSubcategorySelect.addEventListener('change', () => populateSubsubcategoriesFor(pairCategorySelect, pairSubcategorySelect, pairSubsubcategorySelect, pairProductSelect, 'pair', true));
+            pairSubsubcategorySelect.addEventListener('change', () => populateProductsFor(pairCategorySelect, pairSubcategorySelect, pairSubsubcategorySelect, pairProductSelect, 'pair', true));
+            pairProductSelect.addEventListener('change', () => showSelectedProductInfoFor(pairProductSelect, pairedProductInfo, pairableProductsList, newStockPairInput));
+
+            editCategorySelect.addEventListener('change', () => populateSubcategoriesFor(editCategorySelect, editSubcategorySelect, editSubsubcategorySelect, editProductSelect, 'edit', false));
+            editSubcategorySelect.addEventListener('change', () => populateSubsubcategoriesFor(editCategorySelect, editSubcategorySelect, editSubsubcategorySelect, editProductSelect, 'edit', false));
+            editSubsubcategorySelect.addEventListener('change', () => populateProductsFor(editCategorySelect, editSubcategorySelect, editSubsubcategorySelect, editProductSelect, 'edit', false));
+            editProductSelect.addEventListener('change', () => showSelectedProductInfoFor(editProductSelect, editedProductInfo, editableProductsList, newStockEditInput));
+
+            savePairBtn.addEventListener('click', () => saveProductPairing(pairProductSelect.value, newBarcodePairInput.value.trim(), newStockPairInput.value, pairProductModal, () => {
+                populateProductsFor(pairCategorySelect, pairSubcategorySelect, pairSubsubcategorySelect, pairProductSelect, 'pair', true);
+                newBarcodePairInput.value = '';
+                newStockPairInput.value = '';
+                pairedProductInfo.classList.add('hidden');
+            }));
+            saveEditBtn.addEventListener('click', () => saveProductPairing(editProductSelect.value, newBarcodeEditInput.value.trim(), newStockEditInput.value, editBarcodeModal, () => {
+                populateProductsFor(editCategorySelect, editSubcategorySelect, editSubsubcategorySelect, editProductSelect, 'edit', false);
+                newBarcodeEditInput.value = '';
+                newStockEditInput.value = '';
+                editedProductInfo.classList.add('hidden');
+            }));
+
+            scanNewBarcodePairBtn.addEventListener('click', () => requestCameraPermission(newBarcodePairInput));
+            scanNewBarcodeEditBtn.addEventListener('click', () => requestCameraPermission(newBarcodeEditInput));
+            
+            adjustStockBtn.addEventListener('click', openAdjustStockModal);
+            closeAdjustStockBtn.addEventListener('click', () => { stopScanner(); adjustStockModal.classList.add('hidden'); });
+            adjustStockCodeInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') lookupProductForStock(adjustStockCodeInput.value.trim()); });
+            scanAdjustStockBtn.addEventListener('click', () => requestCameraPermission(adjustStockCodeInput));
+            saveStockAdjustmentBtn.addEventListener('click', saveStockAdjustment);
+            stockDecreaseBtn.addEventListener('click', () => { const val = parseInt(adjustStockNewStock.value, 10) || 0; if (val > 0) adjustStockNewStock.value = val - 1; });
+            stockIncreaseBtn.addEventListener('click', () => { const val = parseInt(adjustStockNewStock.value, 10) || 0; adjustStockNewStock.value = val + 1; });
+            discount5PercentCheckbox.addEventListener('change', () => {
+                if (discount5PercentCheckbox.checked) {
+                    discountCustomAmountInput.value = '';
+                }
+                updateSaleTotals();
+            });
+            discountCustomAmountInput.addEventListener('input', () => {
+                if (discountCustomAmountInput.value) {
+                    discount5PercentCheckbox.checked = false;
+                }
+                updateSaleTotals();
+            });
+            focusButtons.forEach(btn => {
+                btn.addEventListener('click', triggerFocus);
+            });
+            syncBtn.addEventListener('click', uploadChangesToGitHub);
+            window.addEventListener('online', updateOnlineStatus);
+            window.addEventListener('offline', updateOnlineStatus);
+
+            initializeApp();
+            updateOnlineStatus();
+        });
+    </script>
+</body>
+</html>
