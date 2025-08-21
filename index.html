@@ -47,20 +47,20 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <!-- TELA INICIAL PARA CARREGAR DADOS -->
+    <!-- TELA INICIAL PARA CONFIGURAR O GITHUB -->
     <div id="setup-view" class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center hidden">
-        <h2 class="text-3xl font-bold text-center text-gray-800">Bem-vindo!</h2>
-        <p class="text-gray-600">Para começar, por favor, carregue o seu ficheiro de base de dados (`.json`).</p>
+        <h2 class="text-3xl font-bold text-center text-gray-800">Configuração Inicial</h2>
+        <p class="text-gray-600">Para começar, insira os dados do seu repositório no GitHub para carregar a base de dados.</p>
         <div>
-            <label for="load-database-input" class="w-full py-3 px-4 inline-flex items-center justify-center font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all cursor-pointer">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd" /></svg>
-                Selecionar Ficheiro de Dados (.json)
-            </label>
-            <input type="file" id="load-database-input" class="hidden" accept=".json">
+            <label for="setup-github-user" class="block text-sm font-medium text-gray-700 text-left">Utilizador do GitHub</label>
+            <input type="text" id="setup-github-user" class="mt-1 block w-full px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: seu-nome-de-usuario">
         </div>
-        <div id="file-selection-status" class="text-sm text-gray-500 min-h-[20px]"></div>
-        <button id="start-load-btn" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all hidden disabled:bg-gray-400" disabled>Iniciar Carregamento</button>
-        <p id="setup-error" class="text-sm text-center text-red-500"></p>
+        <div>
+            <label for="setup-github-repo" class="block text-sm font-medium text-gray-700 text-left">Repositório</label>
+            <input type="text" id="setup-github-repo" class="mt-1 block w-full px-3 py-2 text-sm bg-gray-100 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: meu-repositorio-de-vendas">
+        </div>
+        <button id="start-load-btn" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all">Carregar Base de Dados</button>
+        <p id="setup-error" class="text-sm text-center text-red-500 min-h-[20px]"></p>
     </div>
 
     <!-- TELA DE LOGIN -->
@@ -86,6 +86,9 @@
 
     <!-- TELA PRINCIPAL DA APLICAÇÃO -->
     <div id="app-view" class="w-full max-w-md bg-gray-50 hidden flex flex-col h-screen">
+        <div id="update-notification" class="hidden bg-yellow-400 text-yellow-900 text-center p-2 text-sm">
+            Uma nova versão da base de dados está disponível! Vá a Configurações para atualizar.
+        </div>
         <nav class="bg-white shadow-md">
             <div class="flex justify-around border-b">
                 <button data-tab="vender-view" class="tab-btn flex-1 py-4 px-2 text-center text-sm font-medium border-b-2 border-transparent hover:text-blue-500 transition-all">Vender</button>
@@ -306,7 +309,7 @@
                 <div><label for="pair-category" class="block text-sm font-medium text-gray-700">1. Selecione a Categoria</label><select id="pair-category" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm"><option value="">-- Escolha --</option></select></div>
                 <div><label for="pair-subcategory" class="block text-sm font-medium text-gray-700">2. Selecione a Subcategoria</label><select id="pair-subcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
                 <div id="pair-subsubcategory-container" class="hidden"><label for="pair-subsubcategory" class="block text-sm font-medium text-gray-700">3. Selecione a Sub-Subcategoria (Opcional)</label><select id="pair-subsubcategory" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
-                <div><label for="pair-product" class="block text-sm font-medium text-gray-700">4. Selecione o Produto</label><select id="pair-product" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
+                <div><label for="pair-product" class="block text-sm font-medium text-gray-700">4. Selecione o Produto</label><select id="pair-product" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:text-sm" disabled><option value="">-- Escolha --</option></select></div>
                 <div id="paired-product-info" class="p-3 bg-blue-50 rounded-lg min-h-[60px] hidden"><p class="font-semibold text-blue-800 text-sm" id="paired-product-name"></p><p class="text-xs text-gray-600" id="paired-product-cod"></p><p class="text-xs text-gray-600 mt-1" id="paired-product-current-barcode"></p></div>
                 <div>
                     <label for="new-barcode-pair" class="block text-sm font-medium text-gray-700">5. Digite ou Escaneie o Novo Código de Barras</label>
@@ -546,6 +549,7 @@
             const githubUserInput = document.getElementById('github-user');
             const githubRepoInput = document.getElementById('github-repo');
             const githubPatInput = document.getElementById('github-pat');
+            const updateNotification = document.getElementById('update-notification');
 
             // --- LÓGICA DE HASHING ---
             function hashPassword(password) {
@@ -589,10 +593,11 @@
                     
                     const remoteData = await response.json();
                     
+                    const localData = DB.get('database_info');
                     const localChanges = DB.get('change_log');
-                    const localSales = DB.get('vendas_log');
-                    
-                    if (remoteData.vendas_log.length > localSales.length && localChanges.length === 0) {
+
+                    if (remoteData.version > localData.version && localChanges.length === 0) {
+                        updateNotification.classList.remove('hidden');
                         syncMessage.textContent = 'Nova versão da base de dados encontrada!';
                         showConfirm('Existe uma nova versão da base de dados online. Deseja fazer o download? (Atenção: isto irá substituir os seus dados locais)', (confirmed) => {
                             if (confirmed) {
@@ -600,6 +605,7 @@
                                 DB.set('users', remoteData.users);
                                 DB.set('vendas_log', remoteData.vendas_log);
                                 DB.set('change_log', []);
+                                DB.set('database_info', { version: remoteData.version });
                                 showAlert('Base de dados atualizada com sucesso! A aplicação será recarregada.');
                                 setTimeout(() => location.reload(), 1500);
                             }
@@ -683,61 +689,56 @@
                     setupView.classList.remove('hidden');
                     loginView.classList.add('hidden');
                     appView.classList.add('hidden');
-                    setupDatabaseLoadListeners();
+                    setupInitialLoadListeners();
                 }
             }
             
-            function setupDatabaseLoadListeners() {
-                const loadDatabaseInput = document.getElementById('load-database-input');
+            function setupInitialLoadListeners() {
                 const startLoadBtn = document.getElementById('start-load-btn');
-                const fileSelectionStatus = document.getElementById('file-selection-status');
                 const setupError = document.getElementById('setup-error');
-                let selectedFile = null;
+                const setupGithubUserInput = document.getElementById('setup-github-user');
+                const setupGithubRepoInput = document.getElementById('setup-github-repo');
 
-                loadDatabaseInput.addEventListener('change', (event) => {
-                    selectedFile = event.target.files[0];
-                    if (selectedFile && selectedFile.type === "application/json") {
-                        fileSelectionStatus.textContent = `Ficheiro selecionado: ${selectedFile.name}`;
-                        startLoadBtn.disabled = false;
-                        startLoadBtn.classList.remove('hidden');
-                        setupError.textContent = '';
-                    } else {
-                        fileSelectionStatus.textContent = 'Por favor, selecione um ficheiro .json válido.';
-                        startLoadBtn.disabled = true;
-                        startLoadBtn.classList.add('hidden');
-                        selectedFile = null;
+                startLoadBtn.addEventListener('click', async () => {
+                    const user = setupGithubUserInput.value.trim();
+                    const repo = setupGithubRepoInput.value.trim();
+                    if (!user || !repo) {
+                        setupError.textContent = 'Por favor, preencha o utilizador e o repositório.';
+                        return;
                     }
-                });
 
-                startLoadBtn.addEventListener('click', () => {
-                    if (!selectedFile) return;
+                    const GITHUB_DB_URL = GITHUB_DB_URL_TEMPLATE.replace('{user}', user).replace('{repo}', repo);
+                    setupError.textContent = 'A carregar dados...';
 
-                    const reader = new FileReader();
-                    reader.onload = (e) => {
-                        try {
-                            const data = JSON.parse(e.target.result);
-                            if (data.products && data.users) {
-                                DB.set('products', data.products);
-                                DB.set('users', data.users);
-                                DB.set('vendas_log', data.vendas_log || []);
-                                DB.set('change_log', []); // Initialize change log
-                                localStorage.setItem('db_initialized', 'true');
-                                
-                                setupView.classList.add('hidden');
-                                showLoginView();
-                            } else {
-                                setupError.textContent = 'Ficheiro JSON inválido. A estrutura esperada é { "products": [...], "users": [...] }.';
-                            }
-                        } catch (err) {
-                            setupError.textContent = `Erro ao processar o ficheiro: ${err.message}`;
+                    try {
+                        const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
+                        if (!response.ok) throw new Error('Não foi possível encontrar a base de dados no GitHub.');
+                        
+                        const data = await response.json();
+                        
+                        if (data.products && data.users && data.version) {
+                            DB.set('products', data.products);
+                            DB.set('users', data.users);
+                            DB.set('vendas_log', data.vendas_log || []);
+                            DB.set('change_log', []);
+                            DB.set('database_info', { version: data.version });
+                            localStorage.setItem('db_initialized', 'true');
+                            localStorage.setItem('github_user', user);
+                            localStorage.setItem('github_repo', repo);
+                            
+                            setupView.classList.add('hidden');
+                            showLoginView();
+                        } else {
+                            throw new Error('Ficheiro de dados JSON inválido ou sem versão.');
                         }
-                    };
-                    reader.readAsText(selectedFile);
+                    } catch (err) {
+                        setupError.textContent = `Erro ao carregar: ${err.message}`;
+                    }
                 });
             }
 
             function checkLoggedInState() {
-                let savedUser = localStorage.getItem('loggedInUser') || sessionStorage.getItem('loggedInUser');
+                let savedUser = localStorage.getItem('loggedInUser');
                 if (savedUser) {
                     currentUser = JSON.parse(savedUser);
                     showAppView();
@@ -778,7 +779,7 @@
                     loginError.textContent = 'Utilizador ou senha inválidos.';
                 }
             }
-
+            
             function logout() {
                 currentUser = null;
                 localStorage.removeItem('loggedInUser');
