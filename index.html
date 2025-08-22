@@ -390,6 +390,20 @@
             const GITHUB_DB_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/dados_offline.json`;
             const GITHUB_ACTIONS_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/actions/workflows/update_database.yml/dispatches`;
 
+            // --- BASE DE DADOS INICIAL EMBUTIDA ---
+            const INITIAL_DATABASE = {
+              "version": 1.0,
+              "products": [],
+              "users": [
+                {
+                  "username": "admin",
+                  "password": "8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918",
+                  "role": "admin"
+                }
+              ],
+              "vendas_log": []
+            };
+
             const DB = {
                 get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
                 set: (key, data) => localStorage.setItem(key, JSON.stringify(data)),
@@ -656,28 +670,13 @@
                 }
             }
             
-            async function downloadInitialDatabase() {
+            function setupInitialDatabase() {
+                // Esta função agora é síncrona e usa os dados embutidos
                 loginView.classList.add('hidden');
                 appView.classList.add('hidden');
-                // Mostra uma mensagem de carregamento simples no corpo da página
-                document.body.innerHTML = `<div class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center">
-                    <h2 class="text-3xl font-bold text-center text-gray-800">A configurar a aplicação</h2>
-                    <p class="text-gray-600">A fazer o download da base de dados pela primeira vez. Por favor, aguarde.</p>
-                    <div class="flex justify-center items-center py-4">
-                        <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </div>
-                    <p id="initial-setup-error" class="text-sm text-center text-red-500 min-h-[20px]"></p>
-                </div>`;
                 
                 try {
-                    const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
-                    if (!response.ok) throw new Error('Não foi possível encontrar a base de dados no GitHub.');
-                    
-                    const data = await response.json();
-                    
+                    const data = INITIAL_DATABASE;
                     if (data.products && data.users && data.version) {
                         DB.set('products', data.products);
                         DB.set('users', data.users);
@@ -692,8 +691,7 @@
                         throw new Error('Ficheiro de dados JSON inválido ou sem versão.');
                     }
                 } catch (err) {
-                    const errorP = document.getElementById('initial-setup-error');
-                    if(errorP) errorP.textContent = `Erro ao carregar: ${err.message}. Verifique a sua conexão e o repositório configurado.`;
+                    document.body.innerHTML = `<div class="p-4 text-red-700 bg-red-100 rounded">Erro crítico na base de dados inicial: ${err.message}</div>`;
                 }
             }
 
@@ -701,7 +699,7 @@
                 if (localStorage.getItem('db_initialized')) {
                     checkLoggedInState();
                 } else {
-                    downloadInitialDatabase();
+                    setupInitialDatabase();
                 }
             }
 
