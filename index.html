@@ -386,8 +386,8 @@
             // --- CONFIGURAÇÕES FIXAS DE SINCRONIZAÇÃO ---
             const GITHUB_USER = 'TheDandyHoneybadger';
             const GITHUB_REPO = 'DomiScan2';
-            // URL aponta para um commit específico para maior estabilidade
-            const GITHUB_DB_URL = 'https://raw.githubusercontent.com/TheDandyHoneybadger/DomiScan2/e3c4a1b537a775e7a935560a67115862590795c3/dados_offline.json';
+            // URL CORRIGIDA para apontar para o ficheiro no ramo 'main'
+            const GITHUB_DB_URL = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/main/dados_offline.json`;
             const GITHUB_ACTIONS_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/actions/workflows/update_database.yml/dispatches`;
 
             const DB = {
