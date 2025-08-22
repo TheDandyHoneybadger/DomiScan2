@@ -47,19 +47,6 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
-    <!-- TELA INICIAL DE CARREGAMENTO -->
-    <div id="setup-view" class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center hidden">
-        <h2 class="text-3xl font-bold text-center text-gray-800">A configurar a aplicação</h2>
-        <p class="text-gray-600">A fazer o download da base de dados pela primeira vez. Por favor, aguarde.</p>
-        <div class="flex justify-center items-center py-4">
-            <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-        </div>
-        <p id="setup-error" class="text-sm text-center text-red-500 min-h-[20px]"></p>
-    </div>
-
     <!-- TELA DE LOGIN -->
     <div id="login-view" class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg hidden">
         <h2 class="text-3xl font-bold text-center text-gray-800">Aceder ao Sistema</h2>
@@ -396,9 +383,12 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- CONFIGURAÇÕES DE SINCRONIZAÇÃO ---
-            const GITHUB_DB_URL_TEMPLATE = 'https://raw.githubusercontent.com/{user}/{repo}/main/dados_offline.json';
-            const GITHUB_ACTIONS_URL_TEMPLATE = 'https://api.github.com/repos/{user}/{repo}/actions/workflows/update_database.yml/dispatches';
+            // --- CONFIGURAÇÕES FIXAS DE SINCRONIZAÇÃO ---
+            const GITHUB_USER = 'TheDandyHoneybadger';
+            const GITHUB_REPO = 'DomiScan2';
+            // URL aponta para um commit específico para maior estabilidade
+            const GITHUB_DB_URL = 'https://raw.githubusercontent.com/TheDandyHoneybadger/DomiScan2/e3c4a1b537a775e7a935560a67115862590795c3/dados_offline.json';
+            const GITHUB_ACTIONS_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/actions/workflows/update_database.yml/dispatches`;
 
             const DB = {
                 get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
@@ -418,7 +408,6 @@
             let localChangesExist = false;
 
             // --- ELEMENTOS DA UI ---
-            const setupView = document.getElementById('setup-view');
             const loginView = document.getElementById('login-view');
             const appView = document.getElementById('app-view');
             const loginBtn = document.getElementById('login-btn');
@@ -574,14 +563,7 @@
 
             async function checkForUpdates() {
                 if (!navigator.onLine) return;
-                const user = githubUserInput.value.trim();
-                const repo = githubRepoInput.value.trim();
-                if (!user || !repo) {
-                    syncMessage.textContent = 'Preencha o utilizador e repositório do GitHub.';
-                    return;
-                }
-                const GITHUB_DB_URL = GITHUB_DB_URL_TEMPLATE.replace('{user}', user).replace('{repo}', repo);
-
+                
                 syncMessage.textContent = 'A verificar atualizações...';
 
                 try {
@@ -622,12 +604,9 @@
             }
             
             async function uploadChangesToGitHub() {
-                const user = githubUserInput.value.trim();
-                const repo = githubRepoInput.value.trim();
                 const pat = githubPatInput.value.trim();
-
-                if (!user || !repo || !pat) {
-                    showAlert('Por favor, preencha o utilizador, repositório e o Token de Acesso Pessoal do GitHub.');
+                if (!pat) {
+                    showAlert('Por favor, preencha o Token de Acesso Pessoal do GitHub.');
                     return;
                 }
 
@@ -643,7 +622,6 @@
 
                 syncMessage.textContent = 'A enviar alterações para o GitHub Actions...';
                 syncBtn.disabled = true;
-                const GITHUB_ACTIONS_URL = GITHUB_ACTIONS_URL_TEMPLATE.replace('{user}', user).replace('{repo}', repo);
 
                 try {
                     const response = await fetch(GITHUB_ACTIONS_URL, {
@@ -677,61 +655,54 @@
                     syncBtn.disabled = false;
                 }
             }
+            
+            async function downloadInitialDatabase() {
+                loginView.classList.add('hidden');
+                appView.classList.add('hidden');
+                // Mostra uma mensagem de carregamento simples no corpo da página
+                document.body.innerHTML = `<div class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center">
+                    <h2 class="text-3xl font-bold text-center text-gray-800">A configurar a aplicação</h2>
+                    <p class="text-gray-600">A fazer o download da base de dados pela primeira vez. Por favor, aguarde.</p>
+                    <div class="flex justify-center items-center py-4">
+                        <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                    </div>
+                    <p id="initial-setup-error" class="text-sm text-center text-red-500 min-h-[20px]"></p>
+                </div>`;
+                
+                try {
+                    const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
+                    if (!response.ok) throw new Error('Não foi possível encontrar a base de dados no GitHub.');
+                    
+                    const data = await response.json();
+                    
+                    if (data.products && data.users && data.version) {
+                        DB.set('products', data.products);
+                        DB.set('users', data.users);
+                        DB.set('vendas_log', data.vendas_log || []);
+                        DB.set('change_log', []);
+                        DB.set('database_info', { version: data.version });
+                        localStorage.setItem('db_initialized', 'true');
+                        
+                        // Recarrega a página para que o HTML original seja renderizado
+                        location.reload(); 
+                    } else {
+                        throw new Error('Ficheiro de dados JSON inválido ou sem versão.');
+                    }
+                } catch (err) {
+                    const errorP = document.getElementById('initial-setup-error');
+                    if(errorP) errorP.textContent = `Erro ao carregar: ${err.message}. Verifique a sua conexão e o repositório configurado.`;
+                }
+            }
 
             function initializeApp() {
                 if (localStorage.getItem('db_initialized')) {
-                    setupView.classList.add('hidden');
                     checkLoggedInState();
                 } else {
-                    setupView.classList.remove('hidden');
-                    loginView.classList.add('hidden');
-                    appView.classList.add('hidden');
-                    setupInitialLoadListeners();
+                    downloadInitialDatabase();
                 }
-            }
-            
-            function setupInitialLoadListeners() {
-                const startLoadBtn = document.getElementById('start-load-btn');
-                const setupError = document.getElementById('setup-error');
-                const setupGithubUserInput = document.getElementById('setup-github-user');
-                const setupGithubRepoInput = document.getElementById('setup-github-repo');
-
-                startLoadBtn.addEventListener('click', async () => {
-                    const user = setupGithubUserInput.value.trim();
-                    const repo = setupGithubRepoInput.value.trim();
-                    if (!user || !repo) {
-                        setupError.textContent = 'Por favor, preencha o utilizador e o repositório.';
-                        return;
-                    }
-
-                    const GITHUB_DB_URL = GITHUB_DB_URL_TEMPLATE.replace('{user}', user).replace('{repo}', repo);
-                    setupError.textContent = 'A carregar dados...';
-
-                    try {
-                        const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
-                        if (!response.ok) throw new Error('Não foi possível encontrar a base de dados no GitHub.');
-                        
-                        const data = await response.json();
-                        
-                        if (data.products && data.users && data.version) {
-                            DB.set('products', data.products);
-                            DB.set('users', data.users);
-                            DB.set('vendas_log', data.vendas_log || []);
-                            DB.set('change_log', []);
-                            DB.set('database_info', { version: data.version });
-                            localStorage.setItem('db_initialized', 'true');
-                            localStorage.setItem('github_user', user);
-                            localStorage.setItem('github_repo', repo);
-                            
-                            setupView.classList.add('hidden');
-                            showLoginView();
-                        } else {
-                            throw new Error('Ficheiro de dados JSON inválido ou sem versão.');
-                        }
-                    } catch (err) {
-                        setupError.textContent = `Erro ao carregar: ${err.message}`;
-                    }
-                });
             }
 
             function checkLoggedInState() {
@@ -796,8 +767,9 @@
                     adminTabBtn.classList.add('hidden');
                     historyUserFilterContainer.classList.add('hidden');
                 }
-                githubUserInput.value = localStorage.getItem('github_user') || '';
-                githubRepoInput.value = localStorage.getItem('github_repo') || '';
+                // Preenche os campos de configuração com os valores fixos
+                githubUserInput.value = GITHUB_USER;
+                githubRepoInput.value = GITHUB_REPO;
                 switchTab('vender-view');
                 startNewSale();
             }
@@ -1439,6 +1411,25 @@
                     adjustStockControls.classList.add('hidden');
                     saveStockAdjustmentBtn.disabled = true;
                 }
+            }
+            
+            // Funções de alerta e confirmação
+            function showAlert(message) {
+                alertMessage.textContent = message;
+                alertModal.classList.remove('hidden');
+            }
+
+            function showConfirm(message, callback) {
+                confirmMessage.textContent = message;
+                confirmModal.classList.remove('hidden');
+                confirmYesBtn.onclick = () => {
+                    confirmModal.classList.add('hidden');
+                    callback(true);
+                };
+                confirmNoBtn.onclick = () => {
+                    confirmModal.classList.add('hidden');
+                    callback(false);
+                };
             }
 
             async function requestCameraPermission(target) {
