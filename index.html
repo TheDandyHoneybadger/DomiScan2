@@ -244,8 +244,9 @@
                             <span id="sync-status" class="text-sm font-medium text-gray-600">Verificando...</span>
                         </div>
                         <p id="sync-message" class="text-xs text-center text-gray-500 min-h-[32px]"></p>
-                        <button id="sync-btn" class="w-full py-2 font-semibold text-white bg-gray-600 rounded-lg hover:bg-gray-700 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
-                            Sincronizar Agora
+                        <button id="download-update-btn" class="hidden w-full py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all">Baixar Nova Versão</button>
+                        <button id="sync-btn" class="w-full py-2 font-semibold text-white bg-gray-600 rounded-lg hover:bg-gray-700 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed mt-2" disabled>
+                            Enviar Alterações
                         </button>
                     </div>
 
@@ -547,6 +548,7 @@
             const githubRepoInput = document.getElementById('github-repo');
             const githubPatInput = document.getElementById('github-pat');
             const updateNotification = document.getElementById('update-notification');
+            const downloadUpdateBtn = document.getElementById('download-update-btn');
 
             // --- LÓGICA DE HASHING ---
             function hashPassword(password) {
@@ -588,18 +590,8 @@
 
                     if (remoteData.version > localData.version && localChanges.length === 0) {
                         updateNotification.classList.remove('hidden');
+                        downloadUpdateBtn.classList.remove('hidden');
                         syncMessage.textContent = 'Nova versão da base de dados encontrada!';
-                        showConfirm('Existe uma nova versão da base de dados online. Deseja fazer o download? (Atenção: isto irá substituir os seus dados locais)', (confirmed) => {
-                            if (confirmed) {
-                                DB.set('products', remoteData.products);
-                                DB.set('users', remoteData.users);
-                                DB.set('vendas_log', remoteData.vendas_log);
-                                DB.set('change_log', []);
-                                DB.set('database_info', { version: remoteData.version });
-                                showAlert('Base de dados atualizada com sucesso! A aplicação será recarregada.');
-                                setTimeout(() => location.reload(), 1500);
-                            }
-                        });
                     } else if (localChanges.length > 0) {
                         syncMessage.textContent = 'Você tem alterações locais para enviar.';
                         localChangesExist = true;
@@ -1663,6 +1655,28 @@
             });
             
             syncBtn.addEventListener('click', uploadChangesToGitHub);
+            downloadUpdateBtn.addEventListener('click', async () => {
+                showConfirm('Existe uma nova versão da base de dados online. Deseja fazer o download? (Atenção: isto irá substituir os seus dados locais)', async (confirmed) => {
+                    if (confirmed) {
+                        try {
+                            const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
+                            if (!response.ok) throw new Error('Falha ao obter dados do GitHub.');
+                            const remoteData = await response.json();
+
+                            DB.set('products', remoteData.products);
+                            DB.set('users', remoteData.users);
+                            DB.set('vendas_log', remoteData.vendas_log || []);
+                            DB.set('change_log', []);
+                            DB.set('database_info', { version: remoteData.version });
+                            showAlert('Base de dados atualizada com sucesso! A aplicação será recarregada.');
+                            setTimeout(() => location.reload(), 1500);
+                        } catch (error) {
+                            showAlert('Não foi possível baixar a atualização. Tente novamente.');
+                            console.error('Erro ao baixar atualização:', error);
+                        }
+                    }
+                });
+            });
             window.addEventListener('online', updateOnlineStatus);
             window.addEventListener('offline', updateOnlineStatus);
             
