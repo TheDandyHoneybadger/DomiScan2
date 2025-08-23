@@ -245,7 +245,8 @@
                             <span id="sync-status" class="text-sm font-medium text-gray-600">Verificando...</span>
                         </div>
                         <p id="sync-message" class="text-xs text-center text-gray-500 min-h-[32px]"></p>
-                        <button id="download-update-btn" class="hidden w-full py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all">Baixar Nova Versão</button>
+                        <button id="check-update-btn" class="w-full py-2 font-semibold text-white bg-blue-500 rounded-lg hover:bg-blue-600 transition-all">Procurar por Atualizações</button>
+                        <button id="download-update-btn" class="hidden w-full py-2 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-all mt-2">Baixar Nova Versão</button>
                         <button id="sync-btn" class="w-full py-2 font-semibold text-white bg-gray-600 rounded-lg hover:bg-gray-700 transition-all disabled:bg-gray-400 disabled:cursor-not-allowed mt-2" disabled>
                             Enviar Alterações
                         </button>
@@ -551,6 +552,7 @@
             const githubPatInput = document.getElementById('github-pat');
             const updateNotification = document.getElementById('update-notification');
             const downloadUpdateBtn = document.getElementById('download-update-btn');
+            const checkUpdateBtn = document.getElementById('check-update-btn');
 
             // --- LÓGICA DE HASHING ---
             function hashPassword(password) {
@@ -1664,8 +1666,9 @@
             });
             
             syncBtn.addEventListener('click', uploadChangesToGitHub);
+            checkUpdateBtn.addEventListener('click', checkForUpdates);
             downloadUpdateBtn.addEventListener('click', async () => {
-                showConfirm('Existe uma nova versão da base de dados online. Deseja fazer o download? (Atenção: isto irá substituir os seus dados locais)', async (confirmed) => {
+                showConfirm('Tem a certeza que deseja baixar e substituir a sua base de dados local pela nova versão online?', async (confirmed) => {
                     if (confirmed) {
                         try {
                             const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
