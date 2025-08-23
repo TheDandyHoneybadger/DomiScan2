@@ -47,6 +47,17 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
+    <!-- TELA DE CONFIGURAÇÃO INICIAL (CARREGAR FICHEIRO) -->
+    <div id="setup-view" class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center hidden">
+        <h2 class="text-3xl font-bold text-gray-800">Configuração Inicial</h2>
+        <p class="text-gray-600">Para usar a aplicação, por favor, carregue o ficheiro <code>dados_offline.json</code>.</p>
+        <div class="mt-4">
+            <input type="file" id="import-db-input" accept=".json" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+        </div>
+        <button id="load-db-btn" class="w-full py-3 mt-4 font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:bg-gray-400" disabled>Carregar e Iniciar</button>
+        <p id="setup-error" class="text-sm text-center text-red-500 min-h-[20px]"></p>
+    </div>
+
     <!-- TELA DE LOGIN -->
     <div id="login-view" class="w-full max-w-md p-8 space-y-6 bg-white rounded-xl shadow-lg hidden">
         <h2 class="text-3xl font-bold text-center text-gray-800">Aceder ao Sistema</h2>
@@ -211,16 +222,16 @@
                         <p>Utilizador logado: <span id="current-user-info" class="font-semibold"></span></p>
                     </div>
 
-                    <div class="p-4 bg-gray-100 rounded-lg space-y-4">
+                    <div id="sync-section" class="p-4 bg-gray-100 rounded-lg space-y-4">
                         <h3 class="font-semibold text-lg text-gray-700 text-center">Sincronização com GitHub</h3>
                         
                         <div>
                             <label for="github-user" class="block text-sm font-medium text-gray-700">Utilizador do GitHub</label>
-                            <input type="text" id="github-user" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: seu-nome-de-usuario" disabled>
+                            <input type="text" id="github-user" class="mt-1 block w-full px-3 py-2 text-sm bg-gray-200 border border-gray-300 rounded-lg" disabled>
                         </div>
                         <div>
                             <label for="github-repo" class="block text-sm font-medium text-gray-700">Repositório</label>
-                            <input type="text" id="github-repo" class="mt-1 block w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="ex: meu-repositorio-de-vendas" disabled>
+                            <input type="text" id="github-repo" class="mt-1 block w-full px-3 py-2 text-sm bg-gray-200 border border-gray-300 rounded-lg" disabled>
                         </div>
                         <div>
                             <label for="github-pat" class="block text-sm font-medium text-gray-700">Token de Acesso Pessoal (PAT)</label>
@@ -386,7 +397,6 @@
             // --- CONFIGURAÇÕES FIXAS DE SINCRONIZAÇÃO ---
             const GITHUB_USER = 'TheDandyHoneybadger';
             const GITHUB_REPO = 'DomiScan2';
-            // URL mais robusta usando jsDelivr CDN
             const GITHUB_DB_URL = `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/dados_offline.json`;
             const GITHUB_ACTIONS_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/actions/workflows/update_database.yml/dispatches`;
 
@@ -408,6 +418,7 @@
             let localChangesExist = false;
 
             // --- ELEMENTOS DA UI ---
+            const setupView = document.getElementById('setup-view');
             const loginView = document.getElementById('login-view');
             const appView = document.getElementById('app-view');
             const loginBtn = document.getElementById('login-btn');
@@ -429,6 +440,7 @@
             const historyContent = document.getElementById('history-content');
             const exportSalesBtn = document.getElementById('export-sales-btn');
             const exportDataBtn = document.getElementById('export-data-btn');
+            const exportChangesBtn = document.getElementById('export-changes-btn');
             const alertModal = document.getElementById('alert-modal');
             const alertMessage = document.getElementById('alert-message');
             const closeAlertBtn = document.getElementById('close-alert-btn');
@@ -449,6 +461,8 @@
             const cancelAddBtn = document.getElementById('cancel-add-btn');
             const discountInfo = document.getElementById('discount-info');
             const discountAmountSpan = document.getElementById('discount-amount');
+            const discount5PercentCheckbox = document.getElementById('discount-5-percent');
+            const discountCustomAmountInput = document.getElementById('discount-custom-amount');
             const historyDateInput = document.getElementById('history-date');
             const historyTotalSpan = document.getElementById('history-total');
             const addProductScannerContainer = document.getElementById('add-product-scanner-container');
@@ -506,9 +520,6 @@
             const exportAllDataBtn = document.getElementById('export-all-data-btn');
             const importFileInput = document.getElementById('import-file-input');
             const importDataBtn = document.getElementById('import-data-btn');
-            const exportChangesBtn = document.getElementById('export-changes-btn');
-            const discount5PercentCheckbox = document.getElementById('discount-5-percent');
-            const discountCustomAmountInput = document.getElementById('discount-custom-amount');
             const focusButtons = document.querySelectorAll('.focus-btn');
             const editBarcodeBtn = document.getElementById('edit-barcode-btn');
             const editBarcodeModal = document.getElementById('edit-barcode-modal');
@@ -557,7 +568,7 @@
                     statusDot.classList.add('offline');
                     statusDot.classList.remove('online');
                     syncBtn.disabled = true;
-                    syncMessage.textContent = 'As alterações estão a ser guardadas localmente.';
+                    syncMessage.textContent = 'Funcionalidades online desativadas.';
                 }
             }
 
@@ -599,7 +610,7 @@
 
                 } catch (error) {
                     console.error('Erro ao verificar atualizações:', error);
-                    syncMessage.textContent = 'Erro ao contactar o GitHub. Verifique o nome do utilizador/repositório.';
+                    syncMessage.textContent = 'Erro ao contactar o GitHub.';
                 }
             }
             
@@ -639,7 +650,7 @@
                     });
 
                     if (response.status !== 204) {
-                        throw new Error(`O GitHub respondeu com o status ${response.status}. Verifique as suas credenciais e o nome do repositório.`);
+                        throw new Error(`O GitHub respondeu com o status ${response.status}. Verifique as suas credenciais.`);
                     }
                     
                     showAlert('Pedido de atualização enviado com sucesso para o GitHub Actions! Aguarde alguns minutos para que a base de dados seja atualizada.');
@@ -655,54 +666,70 @@
                     syncBtn.disabled = false;
                 }
             }
-            
-            async function downloadInitialDatabase() {
-                loginView.classList.add('hidden');
-                appView.classList.add('hidden');
-                // Mostra uma mensagem de carregamento simples no corpo da página
-                document.body.innerHTML = `<div class="w-full max-w-md p-8 space-y-4 bg-white rounded-xl shadow-lg text-center">
-                    <h2 class="text-3xl font-bold text-center text-gray-800">A configurar a aplicação</h2>
-                    <p class="text-gray-600">A fazer o download da base de dados pela primeira vez. Por favor, aguarde.</p>
-                    <div class="flex justify-center items-center py-4">
-                        <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                    </div>
-                    <p id="initial-setup-error" class="text-sm text-center text-red-500 min-h-[20px]"></p>
-                </div>`;
-                
-                try {
-                    const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
-                    if (!response.ok) throw new Error('Não foi possível encontrar a base de dados. Verifique a sua ligação à internet.');
-                    
-                    const data = await response.json();
-                    
-                    if (data.products && data.users && data.version) {
-                        DB.set('products', data.products);
-                        DB.set('users', data.users);
-                        DB.set('vendas_log', data.vendas_log || []);
-                        DB.set('change_log', []);
-                        DB.set('database_info', { version: data.version });
-                        localStorage.setItem('db_initialized', 'true');
-                        
-                        // Recarrega a página para que o HTML original seja renderizado
-                        location.reload(); 
-                    } else {
-                        throw new Error('Ficheiro de dados JSON inválido ou sem versão.');
-                    }
-                } catch (err) {
-                    const errorP = document.getElementById('initial-setup-error');
-                    if(errorP) errorP.textContent = `Erro ao carregar: ${err.message}.`;
-                }
-            }
 
+            // --- LÓGICA DE INICIALIZAÇÃO ---
             function initializeApp() {
                 if (localStorage.getItem('db_initialized')) {
                     checkLoggedInState();
                 } else {
-                    downloadInitialDatabase();
+                    setupView.classList.remove('hidden');
+                    loginView.classList.add('hidden');
+                    appView.classList.add('hidden');
+                    setupFileLoadListeners();
                 }
+            }
+
+            function setupFileLoadListeners() {
+                const fileInput = document.getElementById('import-db-input');
+                const loadBtn = document.getElementById('load-db-btn');
+                const setupError = document.getElementById('setup-error');
+                let fileContent = null;
+
+                fileInput.addEventListener('change', (event) => {
+                    const file = event.target.files[0];
+                    if (file && file.name.endsWith('.json')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            fileContent = e.target.result;
+                            loadBtn.disabled = false;
+                            setupError.textContent = '';
+                        };
+                        reader.onerror = () => {
+                            setupError.textContent = 'Erro ao ler o ficheiro.';
+                            loadBtn.disabled = true;
+                            fileContent = null;
+                        };
+                        reader.readAsText(file);
+                    } else {
+                        setupError.textContent = 'Por favor, selecione um ficheiro .json válido.';
+                        loadBtn.disabled = true;
+                        fileContent = null;
+                    }
+                });
+
+                loadBtn.addEventListener('click', () => {
+                    if (!fileContent) {
+                        setupError.textContent = 'Nenhum ficheiro carregado.';
+                        return;
+                    }
+                    try {
+                        const data = JSON.parse(fileContent);
+                        if (data.products && data.users && data.version) {
+                            DB.set('products', data.products);
+                            DB.set('users', data.users);
+                            DB.set('vendas_log', data.vendas_log || []);
+                            DB.set('change_log', []);
+                            DB.set('database_info', { version: data.version });
+                            localStorage.setItem('db_initialized', 'true');
+                            
+                            location.reload();
+                        } else {
+                            throw new Error('Ficheiro JSON inválido. Faltam as chaves "products", "users" ou "version".');
+                        }
+                    } catch (err) {
+                        setupError.textContent = `Erro: ${err.message}`;
+                    }
+                });
             }
 
             function checkLoggedInState() {
@@ -716,6 +743,7 @@
             }
 
             function showLoginView() {
+                setupView.classList.add('hidden');
                 appView.classList.add('hidden');
                 loginView.classList.remove('hidden');
                 usernameInput.value = '';
@@ -733,7 +761,8 @@
                 }
                 
                 const users = DB.get('users');
-                const user = users.find(u => u.username === username && u.password === hashedPassword);
+                // CORREÇÃO: Comparar utilizadores ignorando maiúsculas/minúsculas
+                const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === hashedPassword);
 
                 if (user) {
                     if (keepLoggedInCheckbox.checked) {
@@ -759,17 +788,21 @@
                 loginView.classList.add('hidden');
                 appView.classList.remove('hidden');
                 currentUserInfo.textContent = `${currentUser.username} (${currentUser.role})`;
+                
+                const syncSection = document.getElementById('sync-section');
                 if (currentUser.role === 'admin') {
                     adminTabBtn.classList.remove('hidden');
                     historyUserFilterContainer.classList.remove('hidden');
                     populateUserFilter();
+                    syncSection.classList.remove('hidden');
+                    githubUserInput.value = GITHUB_USER;
+                    githubRepoInput.value = GITHUB_REPO;
+                    updateOnlineStatus();
                 } else {
                     adminTabBtn.classList.add('hidden');
                     historyUserFilterContainer.classList.add('hidden');
+                    syncSection.classList.add('hidden');
                 }
-                // Preenche os campos de configuração com os valores fixos
-                githubUserInput.value = GITHUB_USER;
-                githubRepoInput.value = GITHUB_REPO;
                 switchTab('vender-view');
                 startNewSale();
             }
@@ -1060,6 +1093,10 @@
                     details: details
                 });
                 DB.set('change_log', log);
+                localChangesExist = true; // CORREÇÃO: Atualiza o estado imediatamente
+                if (syncMessage) {
+                    syncMessage.textContent = 'Você tem alterações locais para enviar.';
+                }
             }
 
             function addNewProduct(event) {
@@ -1130,10 +1167,9 @@
                     showAlert('Produto não encontrado para ajustar o estoque.');
                     return;
                 }
-                const oldStock = products[productIndex].estoque;
                 products[productIndex].estoque = newStock;
                 DB.set('products', products);
-                logChange('adjust_stock', { cod: productForStockAdjustment.cod, oldStock: oldStock, newStock: newStock });
+                logChange('adjust_stock', { cod: productForStockAdjustment.cod, oldStock: products[productIndex].estoque, newStock: newStock });
                 showAlert('Estoque atualizado com sucesso localmente!');
                 adjustStockModal.classList.add('hidden');
             }
@@ -1148,7 +1184,7 @@
                     return;
                 }
                 let users = DB.get('users');
-                if (users.some(u => u.username === newUsername)) {
+                if (users.some(u => u.username.toLowerCase() === newUsername.toLowerCase())) {
                     showAlert('Já existe um utilizador com este nome.');
                     return;
                 }
@@ -1156,7 +1192,7 @@
                 const hashedPassword = hashPassword(newPassword);
                 users.push({ username: newUsername, password: hashedPassword, role: newRole });
                 DB.set('users', users);
-                logChange('create_user', { username: newUsername, role: newRole, password: hashedPassword });
+                logChange('create_user', { username: newUsername, role: newRole });
                 showAlert('Utilizador registado com sucesso localmente.');
                 addUserForm.reset();
                 addUserModal.classList.add('hidden');
@@ -1191,7 +1227,8 @@
                     products: DB.get('products'), 
                     users: DB.get('users'), 
                     vendas_log: DB.get('vendas_log'), 
-                    change_log: DB.get('change_log') 
+                    change_log: DB.get('change_log'),
+                    database_info: DB.get('database_info')
                 };
                 const jsonString = JSON.stringify(allData, null, 2);
                 const blob = new Blob([jsonString], {type: "application/json"});
@@ -1220,6 +1257,7 @@
                                     DB.set('users', data.users);
                                     DB.set('vendas_log', data.vendas_log || []);
                                     DB.set('change_log', data.change_log || []);
+                                    DB.set('database_info', data.database_info || { version: 1.0 });
                                     localStorage.setItem('db_initialized', 'true');
                                     showAlert('Dados importados com sucesso! A aplicação será recarregada.');
                                     setTimeout(() => location.reload(), 1500);
@@ -1623,12 +1661,13 @@
             focusButtons.forEach(btn => {
                 btn.addEventListener('click', triggerFocus);
             });
+            
             syncBtn.addEventListener('click', uploadChangesToGitHub);
             window.addEventListener('online', updateOnlineStatus);
             window.addEventListener('offline', updateOnlineStatus);
-
+            
+            // --- INICIA A APLICAÇÃO ---
             initializeApp();
-            updateOnlineStatus();
         });
     </script>
 </body>
