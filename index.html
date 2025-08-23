@@ -218,8 +218,9 @@
                  <div class="bg-white w-full rounded-xl shadow-md p-6 space-y-6">
                     <h2 class="text-xl font-bold text-gray-800 text-center">Configurações</h2>
                     
-                    <div class="text-center">
+                    <div class="text-center space-y-1">
                         <p>Utilizador logado: <span id="current-user-info" class="font-semibold"></span></p>
+                        <p class="text-sm text-gray-500">Versão da Base de Dados: <span id="db-version-info" class="font-semibold"></span></p>
                     </div>
 
                     <div id="sync-section" class="p-4 bg-gray-100 rounded-lg space-y-4">
@@ -477,6 +478,7 @@
             const closeAddUserBtn = document.getElementById('close-add-user-btn');
             const addUserForm = document.getElementById('add-user-form');
             const currentUserInfo = document.getElementById('current-user-info');
+            const dbVersionInfo = document.getElementById('db-version-info');
             const pairProductBtn = document.getElementById('pair-product-btn');
             const pairProductModal = document.getElementById('pair-product-modal');
             const closePairProductBtn = document.getElementById('close-pair-product-btn');
@@ -781,6 +783,13 @@
                 appView.classList.remove('hidden');
                 currentUserInfo.textContent = `${currentUser.username} (${currentUser.role})`;
                 
+                const dbInfo = DB.get('database_info');
+                if (dbInfo && dbInfo.version) {
+                    dbVersionInfo.textContent = dbInfo.version;
+                } else {
+                    dbVersionInfo.textContent = 'N/A';
+                }
+
                 const syncSection = document.getElementById('sync-section');
                 if (currentUser.role === 'admin') {
                     adminTabBtn.classList.remove('hidden');
