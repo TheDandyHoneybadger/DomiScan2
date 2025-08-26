@@ -567,6 +567,7 @@
                     statusDot.classList.add('online');
                     statusDot.classList.remove('offline');
                     syncBtn.disabled = false;
+                    checkUpdateBtn.disabled = false;
                     syncMessage.textContent = 'Pronto para sincronizar.';
                     checkForUpdates();
                 } else {
@@ -574,6 +575,7 @@
                     statusDot.classList.add('offline');
                     statusDot.classList.remove('online');
                     syncBtn.disabled = true;
+                    checkUpdateBtn.disabled = true;
                     syncMessage.textContent = 'Funcionalidades online desativadas.';
                 }
             }
@@ -626,6 +628,9 @@
                     sales: DB.get('vendas_log'),
                     changes: DB.get('change_log')
                 };
+                
+                // DEBUG: Mostra os dados que serão enviados na consola
+                console.log('Enviando para o GitHub:', JSON.stringify(changesToUpload, null, 2));
 
                 syncMessage.textContent = 'A enviar alterações para o GitHub Actions...';
                 syncBtn.disabled = true;
