@@ -171,14 +171,19 @@
             <div id="admin-view" class="tab-content p-4 hidden">
                 <div class="bg-white w-full rounded-xl shadow-md p-6 flex flex-col gap-4">
                     <h2 class="text-xl font-bold text-gray-800 text-center">Painel do Administrador</h2>
+                    
+                    <h3 class="text-lg font-semibold text-gray-700 mt-2 border-b pb-2">Gestão</h3>
                     <button id="add-product-btn" class="w-full py-3 font-semibold text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-all">Registar Novo Produto</button>
                     <button id="pair-product-btn" class="w-full py-3 font-semibold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-all">Casar Produto</button>
                     <button id="edit-barcode-btn" class="w-full py-3 font-semibold text-white bg-blue-800 rounded-lg hover:bg-blue-900 transition-all">Editar Código de Barras</button>
                     <button id="adjust-stock-btn" class="w-full py-3 font-semibold text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-all">Ajustar Estoque</button>
                     <button id="add-user-btn" class="w-full py-3 font-semibold text-white bg-cyan-600 rounded-lg hover:bg-cyan-700 transition-all">Registar Novo Funcionário</button>
-                    <button id="export-data-btn" class="w-full py-3 font-semibold text-white bg-gray-600 rounded-lg hover:bg-gray-700 transition-all">Importar/Exportar Dados</button>
-                    <button id="export-changes-btn" class="w-full py-3 font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-all">Exportar Mudanças</button>
-                    <button id="export-sales-btn" class="w-full py-3 font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-all">Exportar Vendas (CSV)</button>
+
+                    <h3 class="text-lg font-semibold text-gray-700 mt-4 border-b pb-2">Relatórios</h3>
+                    <button id="export-reports-btn" class="w-full py-3 font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-all">Exportar Relatórios (CSV)</button>
+
+                    <h3 class="text-lg font-semibold text-gray-700 mt-4 border-b pb-2">Dados</h3>
+                    <button id="import-export-data-btn" class="w-full py-3 font-semibold text-white bg-gray-600 rounded-lg hover:bg-gray-700 transition-all">Importar/Exportar Backup</button>
                 </div>
             </div>
             <div id="config-view" class="tab-content p-4 hidden">
@@ -358,6 +363,18 @@
                     <input type="file" id="import-file-input" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
                     <button id="import-data-btn" class="w-full mt-3 py-2 font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-all" disabled>Importar Agora</button>
                 </div>
+            </div>
+        </div>
+    </div>
+    <div id="export-reports-modal" class="fixed inset-0 w-full h-full flex items-center justify-center hidden z-50 p-4 modal-bg">
+        <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">Exportar Relatórios</h2>
+                <button id="close-export-reports-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
+            </div>
+            <div class="space-y-4 mt-4">
+                <button id="export-sales-report-btn" class="w-full py-3 font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-all">Exportar Vendas (CSV)</button>
+                <button id="export-stock-report-btn" class="w-full py-3 font-semibold text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-all">Exportar Ajustes de Estoque (CSV)</button>
             </div>
         </div>
     </div>

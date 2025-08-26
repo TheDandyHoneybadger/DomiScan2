@@ -43,9 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalizeSaleBtn = document.getElementById('finalize-sale-btn');
     const clearCartBtn = document.getElementById('clear-cart-btn');
     const historyContent = document.getElementById('history-content');
-    const exportSalesBtn = document.getElementById('export-sales-btn');
-    const exportDataBtn = document.getElementById('export-data-btn');
-    const exportChangesBtn = document.getElementById('export-changes-btn');
     const alertModal = document.getElementById('alert-modal');
     const alertMessage = document.getElementById('alert-message');
     const closeAlertBtn = document.getElementById('close-alert-btn');
@@ -155,6 +152,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateNotification = document.getElementById('update-notification');
     const downloadUpdateBtn = document.getElementById('download-update-btn');
     const checkUpdateBtn = document.getElementById('check-update-btn');
+    const exportReportsBtn = document.getElementById('export-reports-btn');
+    const exportReportsModal = document.getElementById('export-reports-modal');
+    const closeExportReportsBtn = document.getElementById('close-export-reports-btn');
+    const exportSalesReportBtn = document.getElementById('export-sales-report-btn');
+    const exportStockReportBtn = document.getElementById('export-stock-report-btn');
+    const importExportDataBtn = document.getElementById('import-export-data-btn');
 
     // --- LÓGICA DE HASHING ---
     function hashPassword(password) {
@@ -414,10 +417,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function logout() {
-        currentUser = null;
-        localStorage.removeItem('loggedInUser');
-        sessionStorage.removeItem('loggedInUser');
-        showLoginView();
+        showConfirm("Tem a certeza que deseja sair da sua conta?", (confirmed) => {
+            if (confirmed) {
+                currentUser = null;
+                localStorage.removeItem('loggedInUser');
+                sessionStorage.removeItem('loggedInUser');
+                showLoginView();
+            }
+        });
     }
 
     function showAppView() {
@@ -1217,13 +1224,14 @@ document.addEventListener('DOMContentLoaded', () => {
     addToCartBtn.addEventListener('click', addToCart);
     finalizeSaleBtn.addEventListener('click', finalizeSale);
     clearCartBtn.addEventListener('click', () => { if (currentCart.length > 0) showConfirm("Limpar o carrinho e pagamentos?", (c) => c && startNewSale()); else startNewSale(); });
-    exportSalesBtn.addEventListener('click', exportSalesToCSV);
-    exportDataBtn.addEventListener('click', () => exportDataModal.classList.remove('hidden'));
+    exportReportsBtn.addEventListener('click', () => exportReportsModal.classList.remove('hidden'));
+    closeExportReportsBtn.addEventListener('click', () => exportReportsModal.classList.add('hidden'));
+    exportSalesReportBtn.addEventListener('click', exportSalesToCSV);
+    importExportDataBtn.addEventListener('click', () => exportDataModal.classList.remove('hidden'));
     closeExportDataBtn.addEventListener('click', () => exportDataModal.classList.add('hidden'));
     exportAllDataBtn.addEventListener('click', exportAllData);
     importFileInput.addEventListener('change', (e) => { importDataBtn.disabled = !e.target.files.length; });
     importDataBtn.addEventListener('click', () => importAllData({ target: importFileInput }));
-    exportChangesBtn.addEventListener('click', exportUserChanges);
     document.getElementById('register-new-product-link').addEventListener('click', () => {
         const code = codeInput.value.trim();
         addProductModal.classList.remove('hidden');
