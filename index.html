@@ -559,6 +559,20 @@
                 return CryptoJS.SHA256(password).toString(CryptoJS.enc.Hex);
             }
 
+            // --- LÓGICA DE VERSIONAMENTO ---
+            function compareVersions(v1, v2) {
+                const parts1 = v1.split('.').map(Number);
+                const parts2 = v2.split('.').map(Number);
+                const len = Math.max(parts1.length, parts2.length);
+                for (let i = 0; i < len; i++) {
+                    const p1 = parts1[i] || 0;
+                    const p2 = parts2[i] || 0;
+                    if (p1 > p2) return 1;
+                    if (p1 < p2) return -1;
+                }
+                return 0;
+            }
+
             // --- LÓGICA DE SINCRONIZAÇÃO ---
             function updateOnlineStatus() {
                 const isOnline = navigator.onLine;
@@ -594,7 +608,7 @@
                     const localData = DB.get('database_info');
                     const localChanges = DB.get('change_log');
 
-                    if (remoteData.version > localData.version && localChanges.length === 0) {
+                    if (compareVersions(remoteData.version, localData.version) > 0 && localChanges.length === 0) {
                         updateNotification.classList.remove('hidden');
                         downloadUpdateBtn.classList.remove('hidden');
                         syncMessage.textContent = 'Nova versão da base de dados encontrada!';
@@ -762,7 +776,6 @@
                 }
                 
                 const users = DB.get('users');
-                // CORREÇÃO: Comparar utilizadores ignorando maiúsculas/minúsculas
                 const user = users.find(u => u.username.toLowerCase() === username.toLowerCase() && u.password === hashedPassword);
 
                 if (user) {
@@ -1265,7 +1278,7 @@
                                     DB.set('users', data.users);
                                     DB.set('vendas_log', data.vendas_log || []);
                                     DB.set('change_log', data.change_log || []);
-                                    DB.set('database_info', data.database_info || { version: 1.0 });
+                                    DB.set('database_info', data.database_info || { version: "0.0.0.0.0.1" });
                                     localStorage.setItem('db_initialized', 'true');
                                     showAlert('Dados importados com sucesso! A aplicação será recarregada.');
                                     setTimeout(() => location.reload(), 1500);
