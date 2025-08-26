@@ -561,8 +561,11 @@
 
             // --- LÓGICA DE VERSIONAMENTO ---
             function compareVersions(v1, v2) {
-                const parts1 = v1.split('.').map(Number);
-                const parts2 = v2.split('.').map(Number);
+                const s1 = String(v1);
+                const s2 = String(v2);
+
+                const parts1 = s1.split('.').map(Number);
+                const parts2 = s2.split('.').map(Number);
                 const len = Math.max(parts1.length, parts2.length);
                 for (let i = 0; i < len; i++) {
                     const p1 = parts1[i] || 0;
@@ -618,6 +621,8 @@
                     } else {
                         syncMessage.textContent = 'A sua base de dados está atualizada.';
                         localChangesExist = false;
+                        downloadUpdateBtn.classList.add('hidden');
+                        updateNotification.classList.add('hidden');
                     }
 
                 } catch (error) {
