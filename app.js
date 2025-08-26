@@ -43,9 +43,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const finalizeSaleBtn = document.getElementById('finalize-sale-btn');
     const clearCartBtn = document.getElementById('clear-cart-btn');
     const historyContent = document.getElementById('history-content');
-    const exportSalesBtn = document.getElementById('export-sales-btn');
-    const exportDataBtn = document.getElementById('export-data-btn');
-    const exportChangesBtn = document.getElementById('export-changes-btn');
     const alertModal = document.getElementById('alert-modal');
     const alertMessage = document.getElementById('alert-message');
     const closeAlertBtn = document.getElementById('close-alert-btn');
@@ -155,6 +152,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const updateNotification = document.getElementById('update-notification');
     const downloadUpdateBtn = document.getElementById('download-update-btn');
     const checkUpdateBtn = document.getElementById('check-update-btn');
+    const exportReportsBtn = document.getElementById('export-reports-btn');
+    const exportReportsModal = document.getElementById('export-reports-modal');
+    const closeExportReportsBtn = document.getElementById('close-export-reports-btn');
+    const exportSalesReportBtn = document.getElementById('export-sales-report-btn');
+    const exportStockReportBtn = document.getElementById('export-stock-report-btn');
+    const importExportDataBtn = document.getElementById('import-export-data-btn');
+    const scannerErrorMessages = document.querySelectorAll('.scanner-error-message');
 
     // --- LÓGICA DE HASHING ---
     function hashPassword(password) {
@@ -414,10 +418,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function logout() {
-        currentUser = null;
-        localStorage.removeItem('loggedInUser');
-        sessionStorage.removeItem('loggedInUser');
-        showLoginView();
+        showConfirm("Tem a certeza que deseja sair da sua conta?", (confirmed) => {
+            if (confirmed) {
+                currentUser = null;
+                localStorage.removeItem('loggedInUser');
+                sessionStorage.removeItem('loggedInUser');
+                showLoginView();
+            }
+        });
     }
 
     function showAppView() {
@@ -1115,6 +1123,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function requestCameraPermission(target) {
         scannerTargetInput = target;
+        scannerErrorMessages.forEach(el => el.classList.add('hidden'));
+
         if (!navigator.mediaDevices?.getUserMedia) {
             return showAlert('O seu navegador não suporta o acesso à câmara.');
         }
@@ -1193,17 +1203,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     Quagga.onDetected((result) => {
         if (result?.codeResult?.code) {
-            const code = result.codeResult.code.replace(/\s/g, ''); // Remove espaços do código
-            if (scannerTargetInput) {
+            const code = result.codeResult.code.replace(/\s/g, '');
+            if (!scannerTargetInput) return;
+
+            const products = DB.get('products');
+            const product = products.find(p => p.cod === code || p.barcode === code);
+            
+            let productShouldExist = (
+                scannerTargetInput.id === 'code-input' || 
+                scannerTargetInput.id === 'adjust-stock-code-input'
+            );
+
+            if (!productShouldExist || (productShouldExist && product)) {
                 scannerTargetInput.value = code;
                 if (scannerTargetInput.id === 'code-input') {
                    lookupProduct(code);
                 } else if (scannerTargetInput.id === 'adjust-stock-code-input') {
                    lookupProductForStock(code);
                 }
+                if ('vibrate' in navigator) navigator.vibrate(100);
+                stopScanner();
+            } else {
+                const activeModal = scannerTargetInput.closest('.modal-bg, #app-view');
+                const errorElement = activeModal.querySelector('.scanner-error-message');
+                
+                if (errorElement) {
+                    errorElement.textContent = 'Código não encontrado.';
+                    errorElement.classList.remove('hidden');
+                    setTimeout(() => {
+                        errorElement.classList.add('hidden');
+                    }, 2500);
+                }
+                if ('vibrate' in navigator) navigator.vibrate([100, 50, 100]);
             }
-            if ('vibrate' in navigator) navigator.vibrate(100);
-            stopScanner();
         }
     });
 
@@ -1217,13 +1249,14 @@ document.addEventListener('DOMContentLoaded', () => {
     addToCartBtn.addEventListener('click', addToCart);
     finalizeSaleBtn.addEventListener('click', finalizeSale);
     clearCartBtn.addEventListener('click', () => { if (currentCart.length > 0) showConfirm("Limpar o carrinho e pagamentos?", (c) => c && startNewSale()); else startNewSale(); });
-    exportSalesBtn.addEventListener('click', exportSalesToCSV);
-    exportDataBtn.addEventListener('click', () => exportDataModal.classList.remove('hidden'));
+    exportReportsBtn.addEventListener('click', () => exportReportsModal.classList.remove('hidden'));
+    closeExportReportsBtn.addEventListener('click', () => exportReportsModal.classList.add('hidden'));
+    exportSalesReportBtn.addEventListener('click', exportSalesToCSV);
+    importExportDataBtn.addEventListener('click', () => exportDataModal.classList.remove('hidden'));
     closeExportDataBtn.addEventListener('click', () => exportDataModal.classList.add('hidden'));
     exportAllDataBtn.addEventListener('click', exportAllData);
     importFileInput.addEventListener('change', (e) => { importDataBtn.disabled = !e.target.files.length; });
     importDataBtn.addEventListener('click', () => importAllData({ target: importFileInput }));
-    exportChangesBtn.addEventListener('click', exportUserChanges);
     document.getElementById('register-new-product-link').addEventListener('click', () => {
         const code = codeInput.value.trim();
         addProductModal.classList.remove('hidden');
