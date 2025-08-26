@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0.0.0.2",
+  "version": "0.0.0.0.0.3",
   "products": [
     {
       "barcode": "",
@@ -6690,7 +6690,7 @@
       "prc_total": 65.0
     },
     {
-      "barcode": "",
+      "barcode": "0810121841167",
       "category": "Protetor",
       "subcategory": "Heavy Play",
       "subsubcategory": "Standard",
@@ -37454,6 +37454,15 @@
       "valores_pagos": "185",
       "desconto": 15.0,
       "valor_total": 185.0
+    },
+    {
+      "timestamp": "2025-08-19T18:41:56.239Z",
+      "vendedor": null,
+      "produtos": "",
+      "formas_pagamento": "",
+      "valores_pagos": "",
+      "desconto": 0.0,
+      "valor_total": null
     },
     {
       "timestamp": "2025-08-19T18:41:56.239Z",
