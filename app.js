@@ -158,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportSalesReportBtn = document.getElementById('export-sales-report-btn');
     const exportStockReportBtn = document.getElementById('export-stock-report-btn');
     const importExportDataBtn = document.getElementById('import-export-data-btn');
+    const sessionLogContent = document.getElementById('session-log-content');
     const scannerErrorMessages = document.querySelectorAll('.scanner-error-message');
 
     // --- LÓGICA DE HASHING ---
@@ -298,6 +299,7 @@ document.addEventListener('DOMContentLoaded', () => {
             syncMessage.textContent = 'Pedido enviado. A base de dados será atualizada em breve.';
             DB.set('change_log', []);
             localChangesExist = false;
+            updateSessionLogUI();
 
         } catch (error) {
             console.error('Erro no upload:', error);
@@ -456,6 +458,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         switchTab('vender-view');
         startNewSale();
+        updateSessionLogUI();
     }
     
     function switchTab(tabId) {
@@ -745,8 +748,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         DB.set('change_log', log);
         localChangesExist = true;
+        updateSessionLogUI();
         if (syncMessage) {
             syncMessage.textContent = 'Você tem alterações locais para enviar.';
+        }
+    }
+
+    function updateSessionLogUI() {
+        const log = DB.get('change_log');
+        if (log.length > 0) {
+            sessionLogContent.innerHTML = log.map(entry => {
+                const date = new Date(entry.timestamp).toLocaleString('pt-BR');
+                return `<p><strong>[${date}]</strong> ${entry.action}: ${JSON.stringify(entry.details)}</p>`;
+            }).join('');
+        } else {
+            sessionLogContent.innerHTML = '<p>Nenhuma alteração pendente.</p>';
         }
     }
 
@@ -853,21 +869,69 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     
     function exportSalesToCSV() {
-        const sales = DB.get('vendas_log');
+        const today = new Date().toISOString().slice(0, 10);
+        const sales = DB.get('vendas_log').filter(sale => sale.timestamp.startsWith(today));
+
         if (sales.length === 0) {
-            showAlert("Nenhuma venda para exportar.");
+            showAlert("Nenhuma venda registada hoje para exportar.");
+            return;
+        }
+
+        const totals = {};
+        let allItems = [];
+
+        sales.forEach(sale => {
+            const payments = sale.formas_pagamento.split(', ');
+            const values = sale.valores_pagos.split(', ').map(parseFloat);
+
+            payments.forEach((method, index) => {
+                let key = method;
+                if (method === 'Cartão de Crédito' && sale.parcelas) {
+                    key = `Crédito (${sale.parcelas})`;
+                }
+                totals[key] = (totals[key] || 0) + values[index];
+            });
+
+            allItems.push(sale.produtos);
+        });
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        csvContent += "Relatório de Vendas do Dia\r\n";
+        csvContent += `Data: ${new Date().toLocaleDateString('pt-BR')}\r\n\r\n`;
+        
+        csvContent += "Itens Vendidos:\r\n";
+        allItems.forEach(item => csvContent += `"${item}"\r\n`);
+        
+        csvContent += "\r\nTotais por Forma de Pagamento:\r\n";
+        for (const [method, total] of Object.entries(totals)) {
+            csvContent += `"${method}";"R$ ${total.toFixed(2)}"\r\n`;
+        }
+
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `relatorio_vendas_${today}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function exportStockAdjustmentsToCSV() {
+        const changes = DB.get('change_log').filter(c => c.action === 'adjust_stock');
+        if (changes.length === 0) {
+            showAlert("Nenhum ajuste de estoque para exportar.");
             return;
         }
         let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "Data e Hora;Vendedor;Produtos;Formas de Pagamento;Valores Pagos;Desconto;Valor Total\r\n";
-        sales.forEach(sale => {
-            let row = `"${sale.timestamp}";"${sale.vendedor}";"${sale.produtos}";"${sale.formas_pagamento}";"${sale.valores_pagos}";"${sale.desconto}";"${sale.valor_total}"`;
+        csvContent += "Data e Hora;Utilizador;Código do Produto;Estoque Antigo;Novo Estoque\r\n";
+        changes.forEach(change => {
+            let row = `"${change.timestamp}";"${change.user}";"${change.details.cod}";"${change.details.oldStock}";"${change.details.newStock}"`;
             csvContent += row + "\r\n";
         });
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `relatorio_vendas_${new Date().toISOString().slice(0, 10)}.csv`);
+        link.setAttribute("download", `relatorio_ajuste_estoque_${new Date().toISOString().slice(0, 10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -922,34 +986,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         reader.readAsText(file);
-    }
-
-    function exportUserChanges() {
-        const userSales = DB.get('vendas_log').filter(s => s.vendedor === currentUser.username);
-        const userChanges = DB.get('change_log').filter(c => c.user === currentUser.username);
-
-        if (userSales.length === 0 && userChanges.length === 0) {
-            showAlert('Nenhuma mudança ou venda encontrada para este utilizador.');
-            return;
-        }
-
-        const exportData = {
-            exportedBy: currentUser.username,
-            exportDate: new Date().toISOString(),
-            sales: userSales,
-            changes: userChanges
-        };
-
-        const jsonString = JSON.stringify(exportData, null, 2);
-        const blob = new Blob([jsonString], {type: "application/json"});
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `mudancas_${currentUser.username}_${new Date().toISOString().slice(0, 10)}.json`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
     }
 
     function openBarcodeModal(modal, categorySelect, onlyUnpaired) {
@@ -1252,6 +1288,7 @@ document.addEventListener('DOMContentLoaded', () => {
     exportReportsBtn.addEventListener('click', () => exportReportsModal.classList.remove('hidden'));
     closeExportReportsBtn.addEventListener('click', () => exportReportsModal.classList.add('hidden'));
     exportSalesReportBtn.addEventListener('click', exportSalesToCSV);
+    exportStockReportBtn.addEventListener('click', exportStockAdjustmentsToCSV);
     importExportDataBtn.addEventListener('click', () => exportDataModal.classList.remove('hidden'));
     closeExportDataBtn.addEventListener('click', () => exportDataModal.classList.add('hidden'));
     exportAllDataBtn.addEventListener('click', exportAllData);
