@@ -1,5 +1,5 @@
 {
-  "version": 0.0.0.0.0.1,
+  "version": "0.0.0.0.0.1",
   "products": [
     {
       "barcode": "",
@@ -37432,6 +37432,11 @@
     {
       "username": "wqqw",
       "password": "ff7608879b0dacca64dbf9ee0a8e3e35796660b9ee91922619566abf66f2ed36",
+      "role": "employee"
+    },
+    {
+      "username": "www",
+      "password": "72870679a73a1ae8ee2ecaf654d3bf06871a3c7df7ffcf6e41852deb4f9eb650",
       "role": "employee"
     }
   ],
