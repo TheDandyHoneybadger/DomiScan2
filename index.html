@@ -9,8 +9,41 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/@ericblade/quagga2@1.6.0/dist/quagga.min.js"></script>
+    <!-- Biblioteca para Hashing SHA256 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .transition-all { transition: all 0.3s ease-in-out; }
+        .modal-bg { background-color: rgba(0, 0, 0, 0.5); }
+        .scanner-container { width: 100%; max-width: 400px; margin: 0 auto; }
+        .scanner-viewport { width: 100% !important; height: auto !important; aspect-ratio: 4/3; overflow: hidden; border-radius: 0.5rem; cursor: pointer; }
+        .scanner-viewport video, .scanner-viewport canvas { width: 100% !important; height: auto !important; }
+        
+        .scanner-container::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 5%;
+            right: 5%;
+            height: 2px;
+            background-color: rgba(255, 0, 0, 0.7);
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        .tab-active {
+            border-bottom-color: #2563eb;
+            color: #2563eb;
+        }
+        .status-dot {
+            height: 10px;
+            width: 10px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        .online { background-color: #22c55e; }
+        .offline { background-color: #ef4444; }
+    </style>
 </head>
 <body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
 
