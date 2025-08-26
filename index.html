@@ -1200,7 +1200,7 @@
                 const hashedPassword = hashPassword(newPassword);
                 users.push({ username: newUsername, password: hashedPassword, role: newRole });
                 DB.set('users', users);
-                logChange('create_user', { username: newUsername, role: newRole });
+                logChange('create_user', { username: newUsername, password: hashedPassword, role: newRole });
                 showAlert('Utilizador registado com sucesso localmente.');
                 addUserForm.reset();
                 addUserModal.classList.add('hidden');
