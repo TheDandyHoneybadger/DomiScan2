@@ -3,14 +3,21 @@ import json
 import os
 import sys
 import hashlib
-import time
 
 DATABASE_FILE = 'database.db'
 JSON_OUTPUT_FILE = 'dados_offline.json'
 
-def hash_password(password):
-    """Gera um hash SHA256 para a senha."""
-    return hashlib.sha256(password.encode('utf-8')).hexdigest()
+def increment_version(version_string):
+    """
+    Incrementa o último número de uma string de versão (ex: '0.0.1' -> '0.0.2').
+    """
+    try:
+        parts = list(map(int, version_string.split('.')))
+        parts[-1] += 1
+        return '.'.join(map(str, parts))
+    except (ValueError, IndexError):
+        # Se o formato for inválido, retorna uma nova versão baseada em timestamp
+        return f"1.{int(time.time())}"
 
 def apply_changes(cursor, changes_data):
     """Aplica as alterações de produtos e utilizadores na base de dados."""
@@ -19,7 +26,6 @@ def apply_changes(cursor, changes_data):
         details = change.get('details')
         
         if action == 'create_user':
-            # A senha já vem com hash do cliente
             cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)",
                            (details['username'], details['password'], details['role']))
         
@@ -35,7 +41,6 @@ def apply_sales(cursor, sales_data):
     """Insere novos registos de vendas no log."""
     sales_log = sales_data.get('sales', [])
     for sale in sales_log:
-        # Uma verificação simples para evitar duplicados exatos
         cursor.execute("SELECT rowid FROM vendas_log WHERE timestamp = ? AND vendedor = ?", (sale['timestamp'], sale['vendedor']))
         if not cursor.fetchone():
             cursor.execute(
@@ -53,18 +58,19 @@ def export_database_to_json(conn):
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    # Ler a versão atual do JSON para incrementá-la
-    version = time.time() # Usar timestamp como fallback
+    version = "0.0.0.0.0.0"
     if os.path.exists(JSON_OUTPUT_FILE):
         try:
             with open(JSON_OUTPUT_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                version = float(data.get("version", time.time()))
+                version = data.get("version", "0.0.0.0.0.0")
         except (json.JSONDecodeError, FileNotFoundError):
-            pass # Mantém o timestamp se o ficheiro estiver corrompido
+            pass
 
+    new_version = increment_version(version)
+    
     output_data = {
-        "version": version + 1, # Incrementar a versão
+        "version": new_version,
         "products": [], "users": [], "vendas_log": []
     }
     
@@ -80,11 +86,10 @@ def export_database_to_json(conn):
     with open(JSON_OUTPUT_FILE, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
     
-    print(f"- Ficheiro '{JSON_OUTPUT_FILE}' atualizado com sucesso para a versão {output_data['version']}.")
+    print(f"- Ficheiro '{JSON_OUTPUT_FILE}' atualizado com sucesso para a versão {new_version}.")
 
 
 if __name__ == "__main__":
-    # O GitHub Actions irá passar os dados como o primeiro argumento
     if len(sys.argv) < 2:
         print("ERRO: Nenhum dado de alteração foi fornecido.")
         sys.exit(1)
@@ -106,7 +111,6 @@ if __name__ == "__main__":
         
         conn.commit()
         
-        # Após aplicar as alterações, exporta a DB inteira para o JSON
         export_database_to_json(conn)
         
     except sqlite3.Error as e:
