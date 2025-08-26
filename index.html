@@ -400,7 +400,7 @@
             // --- CONFIGURAÇÕES FIXAS DE SINCRONIZAÇÃO ---
             const GITHUB_USER = 'TheDandyHoneybadger';
             const GITHUB_REPO = 'DomiScan2';
-            const GITHUB_DB_URL = `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}/dados_offline.json`;
+            const GITHUB_API_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/git/ref/heads/main`;
             const GITHUB_ACTIONS_URL = `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/actions/workflows/update_database.yml/dispatches`;
 
             const DB = {
@@ -564,12 +564,19 @@
                 const s1 = String(v1);
                 const s2 = String(v2);
 
-                // Se uma versão for um timestamp (sem pontos), trate-a como mais antiga
-                if (s1.includes('.') && !s2.includes('.')) return 1;
-                if (!s1.includes('.') && s2.includes('.')) return -1;
-                if (!s1.includes('.') && !s2.includes('.')) return parseFloat(s1) > parseFloat(s2) ? 1 : -1;
+                const isV1Semantic = s1.includes('.');
+                const isV2Semantic = s2.includes('.');
 
+                // Se os formatos forem diferentes, a versão semântica (com pontos) tem prioridade
+                if (isV1Semantic && !isV2Semantic) return 1;
+                if (!isV1Semantic && isV2Semantic) return -1;
+                
+                // Se ambas forem timestamps (sem pontos), compara numericamente
+                if (!isV1Semantic && !isV2Semantic) {
+                    return parseFloat(s1) > parseFloat(s2) ? 1 : -1;
+                }
 
+                // Se ambas forem semânticas, compara parte por parte
                 const parts1 = s1.split('.').map(Number);
                 const parts2 = s2.split('.').map(Number);
                 const len = Math.max(parts1.length, parts2.length);
@@ -609,7 +616,13 @@
                 syncMessage.textContent = 'A verificar atualizações...';
 
                 try {
-                    const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
+                    const apiResponse = await fetch(GITHUB_API_URL);
+                    if (!apiResponse.ok) throw new Error('Falha ao contactar a API do GitHub.');
+                    const refData = await apiResponse.json();
+                    const latestCommitHash = refData.object.sha;
+                    const GITHUB_DB_URL_COMMIT = `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}@${latestCommitHash}/dados_offline.json`;
+
+                    const response = await fetch(GITHUB_DB_URL_COMMIT);
                     if (!response.ok) throw new Error('Falha ao obter dados do GitHub.');
                     
                     const remoteData = await response.json();
@@ -654,7 +667,6 @@
                     changes: DB.get('change_log')
                 };
                 
-                // DEBUG: Mostra os dados que serão enviados na consola
                 console.log('Enviando para o GitHub:', JSON.stringify(changesToUpload, null, 2));
 
                 syncMessage.textContent = 'A enviar alterações para o GitHub Actions...';
@@ -1700,7 +1712,13 @@
                 showConfirm('Tem a certeza que deseja baixar e substituir a sua base de dados local pela nova versão online?', async (confirmed) => {
                     if (confirmed) {
                         try {
-                            const response = await fetch(GITHUB_DB_URL + '?cachebust=' + new Date().getTime());
+                            const apiResponse = await fetch(GITHUB_API_URL);
+                            if (!apiResponse.ok) throw new Error('Falha ao contactar a API do GitHub.');
+                            const refData = await apiResponse.json();
+                            const latestCommitHash = refData.object.sha;
+                            const GITHUB_DB_URL_COMMIT = `https://cdn.jsdelivr.net/gh/${GITHUB_USER}/${GITHUB_REPO}@${latestCommitHash}/dados_offline.json`;
+
+                            const response = await fetch(GITHUB_DB_URL_COMMIT);
                             if (!response.ok) throw new Error('Falha ao obter dados do GitHub.');
                             const remoteData = await response.json();
 
