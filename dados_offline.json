@@ -1,5 +1,5 @@
 {
-  "version": "0.0.0.0.0.1",
+  "version": "0.0.0.0.0.2",
   "products": [
     {
       "barcode": "",
@@ -37438,6 +37438,11 @@
       "username": "www",
       "password": "72870679a73a1ae8ee2ecaf654d3bf06871a3c7df7ffcf6e41852deb4f9eb650",
       "role": "employee"
+    },
+    {
+      "username": "Isac.Dominaria",
+      "password": "b80f3145c6be886bed538f59e6f595797667b34e081212ccaffdc3c37a9fe368",
+      "role": "admin"
     }
   ],
   "vendas_log": [
