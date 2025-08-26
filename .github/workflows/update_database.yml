@@ -25,10 +25,12 @@ jobs:
           python update_script.py '${{ github.event.inputs.changes }}'
         
       - name: Commit and push changes
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'actions@github.com'
           git add database.db dados_offline.json
           # Só faz o commit se houver alterações
           git diff --staged --quiet || git commit -m "Atualização automática da base de dados"
-          git push
+          git push https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git HEAD:${{ github.ref_name }}
