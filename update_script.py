@@ -3,90 +3,127 @@ import json
 import os
 import sys
 import hashlib
+from datetime import datetime
 
 DATABASE_FILE = 'database.db'
 JSON_OUTPUT_FILE = 'dados_offline.json'
 
-def increment_version(version_string):
-    """
-    Incrementa o último número de uma string de versão (ex: '0.0.1' -> '0.0.2').
-    """
-    try:
-        parts = list(map(int, version_string.split('.')))
-        parts[-1] += 1
-        return '.'.join(map(str, parts))
-    except (ValueError, IndexError):
-        # Se o formato for inválido, retorna uma nova versão baseada em timestamp
-        return f"1.{int(time.time())}"
+def hash_password(password):
+    """Gera um hash SHA256 para a senha."""
+    return hashlib.sha256(password.encode('utf-8')).hexdigest()
 
 def apply_changes(cursor, changes_data):
     """Aplica as alterações de produtos e utilizadores na base de dados."""
+    print("A processar alterações de dados (changes)...")
     for change in changes_data.get('changes', []):
-        action = change.get('action')
-        details = change.get('details')
+        action = change.get("action")
+        details = change.get("details")
         
-        if action == 'create_user':
-            cursor.execute("INSERT OR IGNORE INTO users (username, password, role) VALUES (?, ?, ?)",
-                           (details['username'], details['password'], details['role']))
+        if action == "create_user":
+            username = details.get('username')
+            password_hash = details.get('password')
+            role = details.get('role')
+            cursor.execute("SELECT username FROM users WHERE username = ?", (username,))
+            if not cursor.fetchone():
+                cursor.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
+                               (username, password_hash, role))
+                print(f"   - Utilizador '{username}' criado.")
         
-        elif action == 'pair_product':
-            cursor.execute("UPDATE products SET barcode = ? WHERE cod = ?",
-                           (details['newBarcode'], details['cod']))
-        
-        # Adicionar outras lógicas de 'change' aqui
-    
-    print(f"- {len(changes_data.get('changes', []))} alterações de dados processadas.")
+        elif action == "pair_product" or action == "edit_barcode":
+            cod = details.get("cod")
+            new_barcode = details.get("newBarcode")
+            new_stock = details.get("newStock")
+
+            if cod and new_barcode:
+                cursor.execute("UPDATE products SET barcode = ? WHERE cod = ?", (new_barcode, cod))
+                print(f"   - Barcode do produto '{cod}' atualizado para '{new_barcode}'.")
+            
+            if cod and new_stock is not None:
+                cursor.execute("UPDATE products SET estoque = ? WHERE cod = ?", (new_stock, cod))
+                print(f"   - Estoque do produto '{cod}' atualizado para '{new_stock}'.")
+
+        elif action == "adjust_stock":
+             cod = details.get("cod")
+             new_stock = details.get("newStock")
+             if cod and new_stock is not None:
+                cursor.execute("UPDATE products SET estoque = ? WHERE cod = ?", (new_stock, cod))
+                print(f"   - Estoque do produto '{cod}' ajustado para '{new_stock}'.")
+
+    print(f"-> {len(changes_data.get('changes', []))} alterações processadas.")
 
 def apply_sales(cursor, sales_data):
-    """Insere novos registos de vendas no log."""
-    sales_log = sales_data.get('sales', [])
-    for sale in sales_log:
-        cursor.execute("SELECT rowid FROM vendas_log WHERE timestamp = ? AND vendedor = ?", (sale['timestamp'], sale['vendedor']))
-        if not cursor.fetchone():
-            cursor.execute(
-                """INSERT INTO vendas_log (timestamp, vendedor, produtos, formas_pagamento, valores_pagos, desconto, valor_total)
-                VALUES (?, ?, ?, ?, ?, ?, ?)""", (
-                sale['timestamp'], sale['vendedor'], sale['produtos'],
-                sale['formas_pagamento'], sale['valores_pagos'],
-                sale['desconto'], sale['valor_total']
-            ))
-    print(f"- {len(sales_log)} registos de vendas processados.")
+    """Insere novos registos de vendas no log, evitando duplicados."""
+    print("A processar registos de vendas...")
+    
+    # Obter todos os timestamps existentes para uma verificação rápida
+    cursor.execute("SELECT timestamp FROM vendas_log")
+    existing_timestamps = {row[0] for row in cursor.fetchall()}
+    
+    new_sales_count = 0
+    for sale in sales_data.get('sales', []):
+        timestamp = sale.get('timestamp')
+        if not timestamp:
+            print("   - AVISO: Venda sem timestamp encontrada. A ignorar.")
+            continue
+
+        # Insere apenas se o timestamp não existir
+        if timestamp not in existing_timestamps:
+            venda_data = (
+                timestamp,
+                sale.get("vendedor"),
+                sale.get("produtos"),
+                sale.get("formas_pagamento"),
+                sale.get("valores_pagos"),
+                sale.get("desconto", 0),
+                sale.get("total")
+            )
+            cursor.execute("""
+                INSERT INTO vendas_log 
+                (timestamp, vendedor, produtos, formas_pagamento, valores_pagos, desconto, valor_total) 
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, venda_data)
+            new_sales_count += 1
+    
+    print(f"-> {new_sales_count} novas vendas inseridas.")
 
 
 def export_database_to_json(conn):
-    """Exporta o estado atual da base de dados para o ficheiro JSON, incrementando a versão."""
+    """Exporta o estado atual da base de dados para o ficheiro JSON."""
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
     
-    version = "0.0.0.0.0.0"
+    # Ler a versão atual para incrementá-la
+    version = 1.0
     if os.path.exists(JSON_OUTPUT_FILE):
         try:
             with open(JSON_OUTPUT_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                version = data.get("version", "0.0.0.0.0.0")
+                version = float(data.get("version", 1.0)) + 0.1
         except (json.JSONDecodeError, FileNotFoundError):
-            pass
-
-    new_version = increment_version(version)
+            version = 1.0
     
     output_data = {
-        "version": new_version,
+        "version": round(version, 2),
         "products": [], "users": [], "vendas_log": []
     }
     
-    cursor.execute("SELECT * FROM products")
-    output_data["products"] = [dict(row) for row in cursor.fetchall()]
-    
-    cursor.execute("SELECT * FROM users")
-    output_data["users"] = [dict(row) for row in cursor.fetchall()]
+    print(f"\nA gerar novo ficheiro JSON versão: {output_data['version']:.2f}")
 
-    cursor.execute("SELECT * FROM vendas_log")
-    output_data["vendas_log"] = [dict(row) for row in cursor.fetchall()]
+    # Exportar tabelas
+    tables_to_export = ["products", "users", "vendas_log"]
+    for table in tables_to_export:
+        try:
+            cursor.execute(f"SELECT * FROM {table}")
+            rows = cursor.fetchall()
+            output_data[table] = [dict(row) for row in rows]
+        except sqlite3.OperationalError:
+            print(f"-> AVISO: Tabela '{table}' não encontrada. Será criada uma lista vazia.")
+            output_data[table] = []
     
     with open(JSON_OUTPUT_FILE, 'w', encoding='utf-8') as f:
         json.dump(output_data, f, ensure_ascii=False, indent=2)
     
-    print(f"- Ficheiro '{JSON_OUTPUT_FILE}' atualizado com sucesso para a versão {new_version}.")
+    print(f"-> Ficheiro '{JSON_OUTPUT_FILE}' atualizado com sucesso.")
 
 
 if __name__ == "__main__":
